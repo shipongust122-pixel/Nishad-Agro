@@ -836,7 +836,7 @@ export default function EggBusinessApp() {
               </button>
             </form>
             <div className="mt-6 text-xs text-gray-400 space-y-1">
-               <p>সাব-এডমিন: 1234 | অ্যাডমিন: 665911</p>
+               <p>সাব-এডমিন: **** | অ্যাডমিন: ******</p>
                <p className="pt-2 border-t border-gray-100">Developer: Shipon Talukdar</p>
             </div>
           </div>

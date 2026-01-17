@@ -4,8 +4,7 @@ import {
   getAuth, 
   signInAnonymously, 
   onAuthStateChanged,
-  signInWithCustomToken,
-  signOut
+  signInWithCustomToken
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -15,7 +14,6 @@ import {
   onSnapshot, 
   doc, 
   deleteDoc,
-  serverTimestamp,
   query
 } from 'firebase/firestore';
 import { 
@@ -38,13 +36,9 @@ import {
   Store,
   User,
   Settings,
-  Coins,
   Phone,
   Filter,
-  Search,
-  ChevronRight,
-  TrendingUp,
-  AlertCircle
+  ChevronRight
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
@@ -76,7 +70,7 @@ const SELL_UNITS = {
   'soto': { label: 'শত (১০০)', value: 100 }
 };
 
-// --- Reusable Components ---
+// --- Components ---
 
 const Input = ({ label, type = "text", value, onChange, placeholder, required = false, readOnly = false, className = "", icon: Icon }) => (
   <div className={`mb-4 ${className}`}>
@@ -111,21 +105,17 @@ const CustomSelect = ({ label, value, onChange, options, disabled = false, icon:
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-        <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
-      </div>
     </div>
   </div>
 );
 
 const MetricCard = ({ title, value, subValue, icon: Icon, colorClass, blurred = false }) => (
   <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition-all">
-    <div className={`absolute -right-4 -top-4 w-16 h-16 rounded-full opacity-5 group-hover:opacity-10 transition-opacity ${colorClass.split(' ')[0]}`}></div>
     <div className="flex items-center gap-3 mb-3">
       <div className={`p-2.5 rounded-xl ${colorClass}`}>
         <Icon size={20} />
       </div>
-      <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">{title}</span>
+      <span className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">{title}</span>
     </div>
     {blurred ? (
       <div className="flex items-center gap-2">
@@ -160,11 +150,10 @@ export default function App() {
     wholesale: { 'লাল ডিম': '', 'সাদা ডিম': '', 'হাঁসের ডিম': '' }
   });
 
-  // History Filters
+  // Filters
   const [dateFilter, setDateFilter] = useState('today');
   const [typeFilter, setTypeFilter] = useState('all');
 
-  // Form State
   const [formData, setFormData] = useState({
     type: 'sell',
     saleCategory: 'retail',
@@ -179,21 +168,19 @@ export default function App() {
     date: new Date().toISOString().split('T')[0]
   });
 
-  // --- Auth & Data Fetching ---
   useEffect(() => {
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           try {
             await signInWithCustomToken(auth, __initial_auth_token);
-          } catch (tokenError) {
-            console.error("Custom token failed, falling back to anonymous:", tokenError);
+          } catch (e) {
             await signInAnonymously(auth);
           }
         } else {
           await signInAnonymously(auth);
         }
-      } catch (err) { console.error("Firebase Auth Error:", err); }
+      } catch (err) { console.error(err); }
     };
     initAuth();
     const unsub = onAuthStateChanged(auth, setUser);
@@ -203,27 +190,17 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     
-    // Transactions
     const qTr = collection(db, 'artifacts', appId, 'users', user.uid, 'egg_transactions_v2');
     const unsubTr = onSnapshot(qTr, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       docs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setTransactions(docs);
       setLoading(false);
-    }, (error) => {
-      console.error("Transactions snapshot error:", error);
-      setLoading(false);
-    });
+    }, (err) => setLoading(false));
 
-    // Rates
     const docRates = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'rates');
-    const unsubRates = onSnapshot(docRates, (d) => {
-      if (d.exists()) setRates(d.data());
-    }, (error) => {
-      console.error("Rates snapshot error:", error);
-    });
+    const unsubRates = onSnapshot(docRates, (d) => { if (d.exists()) setRates(d.data()); });
 
-    // Auth (Passwords)
     const docAuth = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'auth');
     const unsubAuth = onSnapshot(docAuth, (d) => {
       if (d.exists()) {
@@ -231,14 +208,11 @@ export default function App() {
         if (data.adminPassword) setAdminPassword(data.adminPassword);
         if (data.subAdminPassword) setSubAdminPassword(data.subAdminPassword);
       }
-    }, (error) => {
-      console.error("Auth snapshot error:", error);
     });
 
     return () => { unsubTr(); unsubRates(); unsubAuth(); };
   }, [user]);
 
-  // Auto-fill Rate
   useEffect(() => {
     if (formData.type === 'sell' && rates) {
       if (formData.saleCategory === 'wholesale') {
@@ -249,14 +223,11 @@ export default function App() {
     }
   }, [formData.saleCategory, formData.eggType, formData.unit, formData.type, rates]);
 
-  // --- Calculations ---
   const stats = useMemo(() => {
     let stock = { 'লাল ডিম': 0, 'সাদা ডিম': 0, 'হাঁসের ডিম': 0 };
     let cash = 0, custDue = 0, suppDue = 0, todaySales = 0, todayProfit = 0, todayExp = 0;
     const todayStr = new Date().toISOString().split('T')[0];
-
-    // Simple avg cost logic (mocked for brevity or calculated from 'buy' type)
-    let costs = { 'লাল ডিম': 10, 'সাদা ডিম': 9, 'হাঁসের ডিম': 12 }; // Default/Initial
+    let costs = { 'লাল ডিম': 10, 'সাদা ডিম': 9, 'হাঁসের ডিম': 12 };
 
     transactions.forEach(t => {
       const qInP = parseInt(t.quantityInPieces) || 0;
@@ -285,7 +256,6 @@ export default function App() {
         }
       }
     });
-
     return { stock, cash, custDue, suppDue, todaySales, todayProfit, todayExp };
   }, [transactions]);
 
@@ -298,7 +268,6 @@ export default function App() {
     });
   }, [transactions, dateFilter, typeFilter]);
 
-  // --- Handlers ---
   const handleLogin = (e) => {
     e.preventDefault();
     if (passwordInput === adminPassword) setUserRole('admin');
@@ -311,7 +280,6 @@ export default function App() {
     e.preventDefault();
     if (submitting || !user) return;
     setSubmitting(true);
-
     try {
       let qtyP = 0, total = 0, paid = 0, due = 0;
       if (formData.type === 'expense') {
@@ -320,12 +288,10 @@ export default function App() {
       } else {
         qtyP = parseInt(formData.quantity) * (formData.type === 'sell' ? SELL_UNITS[formData.unit].value : 1);
         const sub = parseFloat(formData.quantity) * parseFloat(formData.rate);
-        const disc = parseFloat(formData.discount || 0);
-        total = sub - disc;
+        total = sub - parseFloat(formData.discount || 0);
         paid = formData.paidAmount === '' ? total : parseFloat(formData.paidAmount);
         due = total - paid;
       }
-
       await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'egg_transactions_v2'), {
         ...formData,
         amount: total,
@@ -334,10 +300,8 @@ export default function App() {
         quantityInPieces: qtyP,
         createdAt: new Date().toISOString()
       });
-
       alert('এন্ট্রি সফল হয়েছে!');
       setActiveTab('dashboard');
-      setFormData(prev => ({ ...prev, quantity: '', paidAmount: '', description: '', customerName: '', discount: '' }));
     } catch (err) { alert('সমস্যা হয়েছে!'); }
     finally { setSubmitting(false); }
   };
@@ -345,59 +309,49 @@ export default function App() {
   if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50 text-orange-600 font-bold">লোড হচ্ছে...</div>;
 
   return (
-    <div className="min-h-screen bg-[#FDFCFB] text-gray-900 pb-24 md:pb-8 flex flex-col items-center">
+    <div className="app-container min-h-screen bg-[#FDFCFB]">
       
-      {/* Login Overlay */}
       {userRole === 'guest' && (
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-20 h-20 bg-orange-100 text-orange-600 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-orange-100 animate-bounce">
-            <Egg size={40} />
+        <div className="login-overlay">
+          <div className="login-card">
+            <div className="icon-box"><Egg size={40} /></div>
+            <h1>নিশাদ এগ্রো</h1>
+            <p>ম্যানেজমেন্ট সিস্টেম</p>
+            <form onSubmit={handleLogin}>
+              <input 
+                type="password" 
+                placeholder="পাসওয়ার্ড"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+              />
+              <button>প্রবেশ করুন</button>
+            </form>
           </div>
-          <h1 className="text-3xl font-black text-gray-900 mb-2">নিশাদ এগ্রো</h1>
-          <p className="text-gray-500 font-medium mb-8">ম্যানেজমেন্ট সিস্টেমে স্বাগতম</p>
-          <form onSubmit={handleLogin} className="w-full max-w-xs space-y-4">
-            <input 
-              type="password" 
-              placeholder="পাসওয়ার্ড লিখুন"
-              className="w-full px-6 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-orange-500 outline-none transition-all text-center text-xl tracking-widest font-bold"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              autoFocus
-            />
-            <button className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black text-lg shadow-lg shadow-orange-100 active:scale-95 transition-all">প্রবেশ করুন</button>
-          </form>
-          <p className="mt-12 text-[10px] text-gray-300 font-bold tracking-widest uppercase">Developer: Shipon Talukdar</p>
         </div>
       )}
 
-      {/* Header */}
-      <header className="w-full max-w-2xl bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 px-5 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-orange-100">
-            <Egg size={22} />
+      <header className="main-header">
+        <div className="header-content max-w-2xl mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="header-icon"><Egg size={22} /></div>
+            <div>
+              <h1 className="text-lg font-black leading-none">নিশাদ এগ্রো</h1>
+              <p className="text-[9px] font-bold uppercase mt-1 opacity-60 flex items-center gap-1"><Phone size={10} /> 01979665911</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-black text-lg leading-none">নিশাদ এগ্রো</h1>
-            <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 tracking-tighter flex items-center gap-1">
-              <Phone size={10} /> 01979665911
-            </p>
+          <div className="text-right">
+            <p className="text-[10px] font-bold opacity-40 uppercase">ক্যাশ</p>
+            <p className="font-black text-orange-600">৳{stats.cash.toLocaleString()}</p>
           </div>
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] font-black text-gray-400 uppercase">ক্যাশ বক্স</p>
-          <p className="font-black text-orange-600 text-lg">৳{stats.cash.toLocaleString()}</p>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="w-full max-w-2xl p-5 flex-1">
-
-        {/* --- Dashboard View --- */}
+      <main className="max-w-2xl mx-auto p-5 pb-32">
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             <div className="grid grid-cols-3 gap-3">
               <MetricCard title="লাল ডিম" value={stats.stock['লাল ডিম']} subValue="পিস" icon={Egg} colorClass="bg-red-50 text-red-600" />
-              <MetricCard title="সাদা ডিম" value={stats.stock['সাদা ডিম']} subValue="পিস" icon={Egg} colorClass="bg-gray-50 text-gray-600" />
+              <MetricCard title="সাদা ডিম" value={stats.stock['সাদা ডিম']} subValue="পিস" icon={Egg} colorClass="bg-gray-100 text-gray-600" />
               <MetricCard title="হাঁস" value={stats.stock['হাঁসের ডিম']} subValue="পিস" icon={Egg} colorClass="bg-blue-50 text-blue-600" />
             </div>
 
@@ -406,279 +360,188 @@ export default function App() {
               <MetricCard title="মহাজন পাবে" value={`৳${stats.suppDue.toLocaleString()}`} icon={User} colorClass="bg-purple-50 text-purple-600" />
             </div>
 
-            <div className="bg-orange-600 rounded-3xl p-6 text-white shadow-xl shadow-orange-100 relative overflow-hidden">
-              <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-              <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-2">আজকের নেট লাভ/লস</p>
-              <div className="flex items-end justify-between">
-                {userRole === 'admin' ? (
-                  <h2 className="text-4xl font-black">৳{stats.todayProfit.toLocaleString()}</h2>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-3xl font-black blur-sm">৳৳৳৳</span>
-                    <Lock size={20} className="opacity-50" />
-                  </div>
-                )}
-                <div className="text-right">
-                  <p className="text-[10px] font-bold opacity-60 uppercase">আজকের বিক্রি</p>
-                  <p className="font-bold">৳{stats.todaySales.toLocaleString()}</p>
-                </div>
+            <div className="profit-banner">
+              <p className="text-[10px] font-bold uppercase opacity-80 mb-1">আজকের লাভ/লস</p>
+              <div className="flex justify-between items-end">
+                {userRole === 'admin' ? <h2 className="text-3xl font-black">৳{stats.todayProfit.toLocaleString()}</h2> : <div className="blur-sm text-2xl font-black">৳৳৳৳৳</div>}
+                <div className="text-right"><p className="text-[9px] uppercase font-bold opacity-60">আজকের বিক্রি</p><p className="font-bold">৳{stats.todaySales}</p></div>
               </div>
             </div>
 
-            {/* Quick Actions / Recent Transactions */}
-            <div className="flex justify-between items-center px-1">
-              <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest">সাম্প্রতিক লেনদেন</h3>
-              <button onClick={() => setActiveTab('history')} className="text-orange-600 font-bold text-[10px] uppercase border-b-2 border-orange-100">সব দেখুন</button>
-            </div>
-
-            <div className="space-y-3">
+            <div className="recent-list space-y-3">
+              <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">সাম্প্রতিক লেনদেন</h3>
               {transactions.slice(0, 4).map(t => (
-                <div key={t.id} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between group">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${t.type === 'sell' ? 'bg-green-50 text-green-600' : t.type === 'buy' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
-                      {t.type === 'sell' ? <ArrowUpCircle size={24}/> : t.type === 'buy' ? <ArrowDownCircle size={24}/> : <MinusCircle size={24}/>}
-                    </div>
+                <div key={t.id} className="transaction-item">
+                  <div className="flex items-center gap-3">
+                    <div className={`t-icon ${t.type}`}>{t.type === 'sell' ? <ArrowUpCircle size={18}/> : t.type === 'buy' ? <ArrowDownCircle size={18}/> : <MinusCircle size={18}/>}</div>
                     <div>
-                      <h4 className="font-bold text-sm text-gray-900">{t.customerName || t.description || t.eggType}</h4>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">
-                        {t.type === 'sell' ? `${t.quantity} ${SELL_UNITS[t.unit]?.label.split(' ')[0]}` : t.date} 
-                        {t.dueAmount > 0 && <span className="text-red-500 ml-1">• বাকি ৳{t.dueAmount}</span>}
-                      </p>
+                      <h4 className="font-bold text-sm leading-tight">{t.customerName || t.description || t.eggType}</h4>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">{t.type === 'sell' ? `${t.quantity} ${SELL_UNITS[t.unit]?.label}` : t.date}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`font-black ${t.type === 'sell' ? 'text-green-600' : 'text-gray-900'}`}>{t.type === 'sell' ? '+' : '-'} ৳{t.amount}</p>
-                    <ChevronRight size={14} className="text-gray-200 ml-auto mt-1" />
-                  </div>
+                  <p className={`font-black text-sm ${t.type === 'sell' ? 'text-green-600' : 'text-gray-900'}`}>{t.type === 'sell' ? '+' : '-'} ৳{t.amount}</p>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* --- Transaction Forms --- */}
         {(activeTab === 'sell' || activeTab === 'buy' || activeTab === 'expense') && (
-          <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
-            <h2 className="text-2xl font-black mb-6 flex items-center gap-3">
-              {activeTab === 'sell' ? <><ShoppingCart className="text-green-600"/> বিক্রি এন্ট্রি</> : activeTab === 'buy' ? <><PlusCircle className="text-blue-600"/> মাল কেনা</> : <><Wallet className="text-red-600"/> খরচ এন্ট্রি</>}
+          <div className="form-card">
+            <h2 className="text-xl font-black mb-6 uppercase flex items-center gap-2">
+              {activeTab === 'sell' ? <ShoppingCart className="text-green-600"/> : activeTab === 'buy' ? <PlusCircle className="text-blue-600"/> : <Wallet className="text-red-600"/>}
+              {activeTab === 'sell' ? 'বিক্রি' : activeTab === 'buy' ? 'মাল কেনা' : 'খরচ'} এন্ট্রি
             </h2>
-            
             <form onSubmit={handleSubmit} className="space-y-2">
               <Input label="তারিখ" type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} required />
-              
               {activeTab !== 'expense' && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <CustomSelect label="ডিমের ধরণ" value={formData.eggType} onChange={e => setFormData(p => ({ ...p, eggType: e.target.value }))} options={EGG_TYPES.map(v => ({ label: v, value: v }))} />
-                    <CustomSelect 
-                      label="একক" 
-                      value={formData.unit} 
-                      onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} 
-                      disabled={activeTab === 'buy' || formData.saleCategory === 'wholesale'}
-                      options={Object.entries(SELL_UNITS).map(([k, v]) => ({ label: v.label, value: k }))} 
-                    />
+                    <CustomSelect label="একক" value={formData.unit} onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} disabled={activeTab === 'buy' || formData.saleCategory === 'wholesale'} options={Object.entries(SELL_UNITS).map(([k, v]) => ({ label: v.label, value: k }))} />
                   </div>
-
                   {activeTab === 'sell' && (
-                    <div className="flex gap-2 mb-4 p-1 bg-gray-50 rounded-2xl">
-                      <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'retail' }))} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${formData.saleCategory === 'retail' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-400'}`}>খুচরা</button>
-                      <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'wholesale' }))} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${formData.saleCategory === 'wholesale' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-400'}`}>পাইকারি</button>
+                    <div className="flex bg-gray-100 p-1 rounded-xl mb-4">
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'retail' }))} className={`flex-1 py-2 rounded-lg text-xs font-bold ${formData.saleCategory === 'retail' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-400'}`}>খুচরা</button>
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'wholesale' }))} className={`flex-1 py-2 rounded-lg text-xs font-bold ${formData.saleCategory === 'wholesale' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-400'}`}>পাইকারি</button>
                     </div>
                   )}
-
                   <div className="grid grid-cols-2 gap-3">
-                    <Input label="পরিমাণ" type="number" value={formData.quantity} onChange={e => setFormData(p => ({ ...p, quantity: e.target.value }))} placeholder="0" required />
-                    <Input label="দর (প্রতি একক)" type="number" value={formData.rate} onChange={e => setFormData(p => ({ ...p, rate: e.target.value }))} placeholder="0.00" required readOnly={activeTab === 'sell' && userRole === 'subadmin'} />
+                    <Input label="পরিমাণ" type="number" value={formData.quantity} onChange={e => setFormData(p => ({ ...p, quantity: e.target.value }))} required />
+                    <Input label="দর" type="number" value={formData.rate} onChange={e => setFormData(p => ({ ...p, rate: e.target.value }))} readOnly={activeTab === 'sell' && userRole === 'subadmin'} required />
                   </div>
-
-                  <Input 
-                    label={activeTab === 'sell' ? "কাস্টমারের নাম" : "মহাজন/পাইকারের নাম"} 
-                    value={formData.customerName} 
-                    onChange={e => setFormData(p => ({ ...p, customerName: e.target.value }))} 
-                    placeholder="নাম লিখুন..." 
-                    required={activeTab === 'buy' || formData.saleCategory === 'wholesale'}
-                  />
-
-                  {activeTab === 'sell' && (
-                    <Input label="ডিসকাউন্ট (টাকা)" type="number" value={formData.discount} onChange={e => setFormData(p => ({ ...p, discount: e.target.value }))} placeholder="0" />
-                  )}
-
-                  <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-50 mt-4">
-                    <div className="p-3 bg-gray-50 rounded-2xl">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">মোট বিল</p>
-                      <p className="text-xl font-black text-gray-800">৳{(parseFloat(formData.quantity || 0) * parseFloat(formData.rate || 0) - parseFloat(formData.discount || 0)).toLocaleString()}</p>
-                    </div>
-                    <Input label="জমা / নগদ" type="number" value={formData.paidAmount} onChange={e => setFormData(p => ({ ...p, paidAmount: e.target.value }))} placeholder="সব পরিশোধ" />
+                  <Input label={activeTab === 'sell' ? "কাস্টমার" : "মহাজন"} value={formData.customerName} onChange={e => setFormData(p => ({ ...p, customerName: e.target.value }))} required={activeTab === 'buy' || formData.saleCategory === 'wholesale'} />
+                  <div className="grid grid-cols-2 gap-3 border-t pt-4">
+                    <div className="bg-gray-50 p-2 rounded-xl text-center"><p className="text-[9px] font-bold text-gray-400 uppercase">মোট</p><p className="font-black text-gray-800">৳{(parseFloat(formData.quantity || 0) * parseFloat(formData.rate || 0) - parseFloat(formData.discount || 0)).toLocaleString()}</p></div>
+                    <Input label="নগদ জমা" type="number" value={formData.paidAmount} onChange={e => setFormData(p => ({ ...p, paidAmount: e.target.value }))} placeholder="সব" />
                   </div>
                 </>
               )}
-
               {activeTab === 'expense' && (
                 <>
-                  <CustomSelect label="খরচের খাত" value={EXPENSE_TYPES.includes(formData.description) ? formData.description : 'অন্যান্য'} onChange={e => setFormData(p => ({ ...p, description: e.target.value === 'অন্যান্য' ? '' : e.target.value }))} options={EXPENSE_TYPES.map(v => ({ label: v, value: v }))} />
-                  {!EXPENSE_TYPES.includes(formData.description) && <Input value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} placeholder="বিবরণ লিখুন..." required />}
-                  <Input label="টাকার পরিমাণ" type="number" value={formData.amount} onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))} placeholder="0.00" required />
+                  <CustomSelect label="খাত" value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} options={EXPENSE_TYPES.map(v => ({ label: v, value: v }))} />
+                  <Input label="টাকা" type="number" value={formData.amount} onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))} required />
                 </>
               )}
-
-              <button disabled={submitting} className={`w-full py-4 rounded-2xl font-black text-white shadow-lg active:scale-95 transition-all mt-6 ${activeTab === 'sell' ? 'bg-green-600 shadow-green-100' : activeTab === 'buy' ? 'bg-blue-600 shadow-blue-100' : 'bg-red-600 shadow-red-100'}`}>
-                {submitting ? 'সেভ হচ্ছে...' : 'সেভ করুন'}
-              </button>
+              <button disabled={submitting} className={`submit-btn ${activeTab}`}>{submitting ? 'প্রসেসিং...' : 'সেভ করুন'}</button>
             </form>
           </div>
         )}
 
-        {/* --- History View --- */}
         {activeTab === 'history' && (
           <div className="space-y-4">
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
               {['all', 'sell', 'buy', 'expense'].map(t => (
-                <button key={t} onClick={() => setTypeFilter(t)} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border transition-all ${typeFilter === t ? 'bg-orange-600 text-white border-orange-600 shadow-md' : 'bg-white text-gray-400 border-gray-100'}`}>
-                  {t === 'all' ? 'সব' : t === 'sell' ? 'বিক্রি' : t === 'buy' ? 'কেনা' : 'খরচ'}
-                </button>
+                <button key={t} onClick={() => setTypeFilter(t)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase border transition-all ${typeFilter === t ? 'bg-orange-600 text-white' : 'bg-white text-gray-400'}`}>{t === 'all' ? 'সব' : t}</button>
               ))}
             </div>
-
-            <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden">
-              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <h3 className="font-black text-xs uppercase tracking-widest text-gray-400">লেনদেনের খাতা</h3>
-                <div className="flex gap-2">
-                  <button onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')} className={`p-2 rounded-lg border transition-all ${dateFilter === 'today' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-white border-gray-100 text-gray-400'}`}>
-                    <Filter size={14} />
-                  </button>
-                </div>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {filteredHistory.length > 0 ? filteredHistory.map(t => (
-                  <div key={t.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                    <div className="flex gap-3 items-center">
-                      <div className={`w-1 h-8 rounded-full ${t.type === 'sell' ? 'bg-green-500' : t.type === 'buy' ? 'bg-blue-500' : 'bg-red-500'}`}></div>
-                      <div>
-                        <h4 className="font-bold text-sm">{t.customerName || t.description || t.eggType}</h4>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">{t.date} • {t.quantity > 0 ? `${t.quantity} ${t.unit}` : 'খরচ'}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-black text-sm">৳{t.amount}</p>
-                      {t.dueAmount > 0 && <p className="text-[9px] font-black text-red-500 bg-red-50 px-1.5 rounded-full inline-block mt-1 uppercase">বাকি: ৳{t.dueAmount}</p>}
-                      {userRole === 'admin' && (
-                        <button onClick={() => { if(window.confirm('মুছতে চান?')) deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'egg_transactions_v2', t.id)); }} className="text-gray-300 hover:text-red-500 ml-2">
-                          <Trash2 size={12} className="inline"/>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )) : <div className="p-10 text-center text-gray-300 font-bold uppercase tracking-widest text-xs">কোনো তথ্য নেই</div>}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- Settings View --- */}
-        {activeTab === 'settings' && userRole === 'admin' && (
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
-              <h2 className="text-xl font-black mb-6 flex items-center gap-2 uppercase tracking-tighter"><Settings size={20}/> রেট সেটআপ</h2>
-              
-              <div className="space-y-6">
-                {EGG_TYPES.map(egg => (
-                  <div key={egg} className="p-4 bg-gray-50 rounded-2xl">
-                    <h3 className="font-black text-sm text-gray-800 mb-3 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500"></div> {egg}</h3>
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                      <div>
-                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">পিস</label>
-                        <input type="number" value={rates.retail[egg]?.pis || ''} onChange={e => setRates(p => ({ ...p, retail: { ...p.retail, [egg]: { ...p.retail[egg], pis: e.target.value } } }))} className="w-full px-2 py-2 rounded-xl border-2 border-gray-100 text-sm font-black text-center" placeholder="0" />
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">হালি</label>
-                        <input type="number" value={rates.retail[egg]?.hali || ''} onChange={e => setRates(p => ({ ...p, retail: { ...p.retail, [egg]: { ...p.retail[egg], hali: e.target.value } } }))} className="w-full px-2 py-2 rounded-xl border-2 border-gray-100 text-sm font-black text-center" placeholder="0" />
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">কেস</label>
-                        <input type="number" value={rates.retail[egg]?.case || ''} onChange={e => setRates(p => ({ ...p, retail: { ...p.retail, [egg]: { ...p.retail[egg], case: e.target.value } } }))} className="w-full px-2 py-2 rounded-xl border-2 border-gray-100 text-sm font-black text-center" placeholder="0" />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                      <label className="text-[10px] font-black text-purple-600 uppercase">পাইকারি (পিস)</label>
-                      <input type="number" value={rates.wholesale[egg] || ''} onChange={e => setRates(p => ({ ...p, wholesale: { ...p.wholesale, [egg]: e.target.value } }))} className="w-24 px-2 py-1.5 rounded-xl border-2 border-purple-50 bg-purple-50 text-purple-700 text-sm font-black text-center" placeholder="0" />
-                    </div>
+            <div className="bg-white rounded-[2rem] border overflow-hidden">
+              <div className="p-4 border-b bg-gray-50/50 flex justify-between items-center"><h3 className="text-[10px] font-black uppercase opacity-40">রেজিস্টার</h3><button onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')} className="p-2 bg-white border rounded-lg"><Filter size={14}/></button></div>
+              <div className="divide-y">
+                {filteredHistory.map(t => (
+                  <div key={t.id} className="p-4 flex justify-between items-center">
+                    <div><h4 className="font-bold text-sm">{t.customerName || t.description || t.eggType}</h4><p className="text-[9px] font-bold text-gray-400">{t.date} • {t.quantity > 0 ? `${t.quantity} ${t.unit}` : 'খরচ'}</p></div>
+                    <div className="text-right"><p className="font-black text-sm">৳{t.amount}</p>{t.dueAmount > 0 && <span className="text-[8px] font-black text-red-500 bg-red-50 px-1.5 rounded-full">বাকি ৳{t.dueAmount}</span>}</div>
                   </div>
                 ))}
               </div>
-
-              <button onClick={async () => { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'rates'), rates); alert('রেট সেভ হয়েছে!'); }} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black mt-6 shadow-xl active:scale-95 transition-all">সেটিংস সেভ করুন</button>
             </div>
-
-            <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100">
-               <h3 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2"><ShieldCheck size={14}/> পাসওয়ার্ড আপডেট</h3>
-               <div className="space-y-3">
-                 <div className="flex gap-2">
-                   <input type="text" placeholder="নতুন অ্যাডমিন পাসওয়ার্ড" className="flex-1 px-4 py-3 bg-gray-50 rounded-xl border border-gray-100 text-sm font-bold" id="newAdminPass" />
-                   <button onClick={async () => { const v = document.getElementById('newAdminPass').value; if(v) { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'auth'), { adminPassword: v }, { merge: true }); alert('আপডেট সফল!'); } }} className="px-4 py-3 bg-gray-100 rounded-xl font-bold text-xs">বদলান</button>
-                 </div>
-                 <div className="flex gap-2">
-                   <input type="text" placeholder="নতুন সাব-এডমিন পাসওয়ার্ড" className="flex-1 px-4 py-3 bg-gray-50 rounded-xl border border-gray-100 text-sm font-bold" id="newSubPass" />
-                   <button onClick={async () => { const v = document.getElementById('newSubPass').value; if(v) { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'auth'), { subAdminPassword: v }, { merge: true }); alert('আপডেট সফল!'); } }} className="px-4 py-3 bg-gray-100 rounded-xl font-bold text-xs">বদলান</button>
-                 </div>
-               </div>
-            </div>
-
-            <button onClick={() => { setUserRole('guest'); setActiveTab('dashboard'); }} className="w-full py-4 text-red-600 font-black flex items-center justify-center gap-2 border-2 border-red-50 rounded-2xl"><LogOut size={18}/> লগআউট করুন</button>
           </div>
         )}
 
+        {activeTab === 'settings' && userRole === 'admin' && (
+          <div className="space-y-6">
+            <div className="form-card">
+              <h2 className="text-lg font-black mb-4 uppercase">রেট সেটআপ</h2>
+              <div className="space-y-4">
+                {EGG_TYPES.map(egg => (
+                  <div key={egg} className="p-4 bg-gray-50 rounded-2xl">
+                    <h3 className="font-black text-xs mb-3">{egg}</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['pis', 'hali', 'case'].map(u => (
+                        <div key={u}><label className="text-[8px] font-black uppercase opacity-40 ml-1">{u}</label><input type="number" value={rates.retail[egg]?.[u] || ''} onChange={e => setRates(p => ({ ...p, retail: { ...p.retail, [egg]: { ...p.retail[egg], [u]: e.target.value } } }))} className="w-full p-2 rounded-lg border font-black text-center text-sm" /></div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <button onClick={async () => { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'rates'), rates); alert('সেভ হয়েছে!'); }} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black mt-4">সেভ করুন</button>
+              </div>
+            </div>
+            <button onClick={() => { setUserRole('guest'); setActiveTab('dashboard'); }} className="w-full py-4 text-red-600 font-black border-2 border-red-50 rounded-2xl flex items-center justify-center gap-2"><LogOut size={18}/> লগআউট</button>
+          </div>
+        )}
       </main>
 
-      {/* Floating Bottom Navigation */}
-      <nav className="fixed bottom-6 left-5 right-5 z-[60] flex items-center justify-around bg-white/80 backdrop-blur-xl border border-white/20 p-2.5 rounded-[2.5rem] shadow-2xl shadow-gray-200 max-w-lg mx-auto">
+      <nav className="bottom-nav">
         {[
           { id: 'dashboard', icon: LayoutDashboard },
           { id: 'buy', icon: ArrowDownCircle },
           { id: 'sell', icon: ArrowUpCircle },
           { id: 'expense', icon: Wallet },
           { id: 'history', icon: History },
-          { id: 'settings', icon: Settings, adminOnly: true },
+          { id: 'settings', icon: Settings, admin: true }
         ].map(item => {
-          if (item.adminOnly && userRole !== 'admin') return null;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`relative p-3 rounded-full transition-all duration-300 ${isActive ? 'bg-orange-600 text-white shadow-lg shadow-orange-200 -translate-y-2' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              <item.icon size={22} />
-              {isActive && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full"></div>}
-            </button>
-          )
+          if (item.admin && userRole !== 'admin') return null;
+          return <button key={item.id} onClick={() => setActiveTab(item.id)} className={`nav-item ${activeTab === item.id ? 'active' : ''}`}><item.icon size={22} /></button>
         })}
       </nav>
 
-      {/* Footer Branding */}
-      <footer className="w-full py-8 text-center">
-        <p className="text-[10px] font-black text-gray-200 uppercase tracking-[0.3em]">Nishad Agro Management System</p>
-      </footer>
-
-      {/* Tailwind & CSS Tweaks */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
-        
-        body {
-          font-family: 'Hind Siliguri', sans-serif;
-          margin: 0;
-          padding: 0;
+        /* Reset and Base Styles - Override Vite defaults */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body, #root { 
+          width: 100% !important; 
+          height: 100% !important; 
+          margin: 0 !important; 
+          padding: 0 !important; 
+          display: block !important; 
+          place-items: initial !important; 
+          text-align: left !important;
           background: #FDFCFB;
+          color: #1a1a1a;
+          font-family: 'Hind Siliguri', system-ui, sans-serif;
         }
 
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .app-container { width: 100%; display: flex; flex-direction: column; }
+        
+        /* Utility */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* Custom Header */
+        .main-header { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); border-b: 1px solid #f0f0f0; padding: 1rem; }
+        .header-content { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .header-icon { background: #ea580c; color: white; padding: 0.5rem; rounded-xl shadow-lg; }
+
+        /* Banner */
+        .profit-banner { background: #ea580c; color: white; padding: 1.5rem; border-radius: 1.5rem; box-shadow: 0 10px 20px rgba(234, 88, 12, 0.2); }
+
+        /* List Items */
+        .transaction-item { background: white; padding: 1rem; border-radius: 1rem; border: 1px solid #f5f5f5; display: flex; justify-content: space-between; align-items: center; }
+        .t-icon { padding: 0.5rem; border-radius: 0.75rem; }
+        .t-icon.sell { background: #f0fdf4; color: #16a34a; }
+        .t-icon.buy { background: #eff6ff; color: #2563eb; }
+        .t-icon.expense { background: #fef2f2; color: #dc2626; }
+
+        /* Login */
+        .login-overlay { position: fixed; inset: 0; z-index: 100; background: white; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+        .login-card { text-align: center; width: 100%; max-width: 320px; }
+        .login-card h1 { font-size: 2rem; font-weight: 900; }
+        .login-card input { width: 100%; padding: 1rem; background: #f9f9f9; border: 2px solid #f0f0f0; border-radius: 1rem; margin-top: 2rem; text-align: center; font-size: 1.5rem; font-weight: 900; letter-spacing: 0.5rem; outline: none; }
+        .login-card button { width: 100%; padding: 1rem; background: #ea580c; color: white; font-weight: 900; border: none; border-radius: 1rem; margin-top: 1rem; cursor: pointer; }
+
+        /* Bottom Nav */
+        .bottom-nav { position: fixed; bottom: 1.5rem; left: 1.25rem; right: 1.25rem; background: rgba(255,255,255,0.9); backdrop-filter: blur(20px); border: 1px solid rgba(0,0,0,0.05); padding: 0.75rem; border-radius: 2rem; display: flex; justify-content: space-around; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 60; }
+        .nav-item { border: none; background: none; color: #ccc; padding: 0.5rem; cursor: pointer; transition: all 0.2s; }
+        .nav-item.active { color: #ea580c; transform: translateY(-5px); }
+
+        /* Form */
+        .form-card { background: white; padding: 1.5rem; border-radius: 2rem; border: 1px solid #f0f0f0; }
+        .submit-btn { width: 100%; padding: 1.25rem; border-radius: 1.25rem; font-weight: 900; color: white; border: none; cursor: pointer; margin-top: 1.5rem; }
+        .submit-btn.sell { background: #16a34a; }
+        .submit-btn.buy { background: #2563eb; }
+        .submit-btn.expense { background: #dc2626; }
       `}</style>
-
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;700&display=swap" />
     </div>
   );
 }

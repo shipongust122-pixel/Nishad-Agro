@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
+// Note: Keeping your current credentials
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
   ? JSON.parse(__firebase_config) 
   : {
@@ -86,8 +87,8 @@ const Section = ({ title, icon: Icon, children, className = "" }) => (
   </div>
 );
 
-const ModernInput = ({ label, type = "text", value, onChange, placeholder, required = false, readOnly = false, icon: Icon, error = false }) => (
-  <div className="flex flex-col gap-1.5 w-full">
+const ModernInput = ({ label, type = "text", value, onChange, placeholder, required = false, readOnly = false, icon: Icon, error = false, className = "" }) => (
+  <div className={`flex flex-col gap-1.5 w-full ${className}`}>
     {label && <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">{label} {required && <span className="text-rose-500">*</span>}</label>}
     <div className="relative group">
       {Icon && <Icon className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${error ? 'text-rose-400' : 'text-gray-400 group-focus-within:text-orange-500'}`} size={16} />}
@@ -161,14 +162,14 @@ export default function App() {
     date: new Date().toISOString().split('T')[0]
   });
 
-  // --- Auth & Initial Data ---
+  // --- Auth & Data Flow ---
   useEffect(() => {
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           try { await signInWithCustomToken(auth, __initial_auth_token); } catch (e) { await signInAnonymously(auth); }
         } else { await signInAnonymously(auth); }
-      } catch (err) { console.error(err); }
+      } catch (err) { console.error("Firebase Auth Error:", err); }
     };
     initAuth();
     const unsub = onAuthStateChanged(auth, setUser);
@@ -199,7 +200,7 @@ export default function App() {
     return () => { unsubTr(); unsubRates(); unsubAuth(); };
   }, [user]);
 
-  // Rate Automation
+  // Rate Automation Logic
   useEffect(() => {
     if (formData.type === 'sell' && rates) {
       if (formData.saleCategory === 'wholesale') {
@@ -210,10 +211,13 @@ export default function App() {
     }
   }, [formData.saleCategory, formData.eggType, formData.unit, formData.type, rates]);
 
+  // Statistics Calculation
   const stats = useMemo(() => {
     let stock = { 'লাল ডিম': 0, 'সাদা ডিম': 0, 'হাঁসের ডিম': 0 };
     let cash = 0, custDue = 0, suppDue = 0, todaySales = 0, todayProfit = 0, todayExp = 0;
     const todayStr = new Date().toISOString().split('T')[0];
+    
+    // Average cost estimation (In a real app, this would be calculated from purchases)
     let costs = { 'লাল ডিম': 10, 'সাদা ডিম': 9, 'হাঁসের ডিম': 12 };
 
     transactions.forEach(t => {
@@ -255,6 +259,7 @@ export default function App() {
     });
   }, [transactions, dateFilter, typeFilter]);
 
+  // Handlers
   const handleLogin = (e) => {
     e.preventDefault();
     if (passwordInput === adminPassword) setUserRole('admin');
@@ -291,47 +296,44 @@ export default function App() {
 
   if (loading) return (
     <div className="h-screen w-full flex flex-col items-center justify-center bg-[#FDFCFB]">
-      <div className="relative w-20 h-20">
+      <div className="relative w-16 h-16">
          <div className="absolute inset-0 border-4 border-orange-100 rounded-full"></div>
          <div className="absolute inset-0 border-4 border-orange-500 rounded-full border-t-transparent animate-spin"></div>
-         <div className="absolute inset-0 flex items-center justify-center text-orange-500"><Egg size={32}/></div>
       </div>
-      <p className="mt-6 text-gray-400 font-black uppercase tracking-[0.3em] text-[10px] animate-pulse">Nishad Agro Loading</p>
+      <p className="mt-4 text-orange-500 font-black uppercase tracking-widest text-[10px]">Loading Nishad Agro</p>
     </div>
   );
 
   return (
-    <div className="app-container min-h-screen bg-[#FDFCFB] flex flex-col items-center">
+    <div className="app-main-wrapper">
       
       {/* Login Screen */}
       {userRole === 'guest' && (
-        <div className="login-overlay fixed inset-0 z-[100] bg-white flex items-center justify-center p-6">
-          <div className="w-full max-w-sm text-center">
-            <div className="w-24 h-24 bg-orange-50 text-orange-600 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-orange-100">
-               <Egg size={48} />
-            </div>
-            <h1 className="text-4xl font-black text-gray-900 tracking-tighter mb-1">নিশাদ এগ্রো</h1>
-            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mb-10">Egg Management Pro</p>
-            <form onSubmit={handleLogin} className="space-y-4">
+        <div className="login-overlay-full">
+          <div className="login-content-box">
+            <div className="login-icon-circle"><Egg size={44} /></div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tighter mb-1">নিশাদ এগ্রো</h1>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mb-8">Management System Pro</p>
+            <form onSubmit={handleLogin} className="w-full space-y-4">
               <input 
                 type="password" 
                 placeholder="পাসওয়ার্ড লিখুন" 
                 value={passwordInput} 
                 onChange={(e) => setPasswordInput(e.target.value)} 
-                className="w-full py-5 px-8 bg-gray-50 border-2 border-gray-100 rounded-3xl focus:border-orange-500 focus:bg-white outline-none transition-all text-center text-3xl font-black tracking-[0.5em] placeholder:tracking-normal placeholder:text-gray-200"
+                className="login-field-input"
                 autoFocus
               />
-              <button className="w-full py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl active:scale-95 transition-all">প্রবেশ করুন</button>
+              <button className="login-action-btn">প্রবেশ করুন</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modern Header */}
-      <header className="w-full sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 px-6 py-4">
-        <div className="max-w-2xl mx-auto flex justify-between items-center">
+      {/* Persistent Header */}
+      <header className="app-global-header">
+        <div className="header-container-inner flex justify-between items-center px-6">
           <div className="flex items-center gap-3">
-             <div className="p-2.5 bg-orange-600 rounded-2xl shadow-lg shadow-orange-100 text-white">
+             <div className="header-icon-box bg-orange-600 shadow-xl shadow-orange-100 text-white">
                 <Egg size={22} />
              </div>
              <div>
@@ -346,19 +348,16 @@ export default function App() {
         </div>
       </header>
 
-      <main className="w-full max-w-2xl px-6 py-8 pb-32">
+      <main className="app-content-area px-6 py-8 pb-32">
         
         {/* DASHBOARD VIEW */}
         {activeTab === 'dashboard' && (
           <div className="animate-in fade-in duration-500 space-y-6">
-            
-            {/* Quick Metrics */}
             <div className="grid grid-cols-2 gap-4">
                <MetricBox title="মার্কেট বাকি" value={`৳${stats.custDue.toLocaleString()}`} icon={Users} colorClass="bg-emerald-50 text-emerald-600" />
                <MetricBox title="মহাজন পাবে" value={`৳${stats.suppDue.toLocaleString()}`} icon={User} colorClass="bg-rose-50 text-rose-600" />
             </div>
 
-            {/* Stock Progress */}
             <Section title="ইনভেন্টরি রিপোর্ট" icon={Store}>
                <div className="space-y-5">
                  {EGG_TYPES.map((egg, idx) => (
@@ -378,9 +377,7 @@ export default function App() {
                </div>
             </Section>
 
-            {/* Profit Highlight */}
-            <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
-               <div className="absolute -top-10 -right-10 w-40 h-40 bg-orange-500/20 rounded-full blur-3xl"></div>
+            <div className="profit-card-highlight">
                <div className="relative z-10 flex justify-between items-end">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-400 mb-2">আজকের নিট প্রফিট</p>
@@ -397,16 +394,15 @@ export default function App() {
                </div>
             </div>
 
-            {/* Recent Ledger */}
-            <div className="flex items-center justify-between px-1">
+            <div className="flex items-center justify-between px-1 pt-4">
                <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest flex items-center gap-2"><History size={14}/> সাম্প্রতিক লেনদেন</h3>
-               <button onClick={() => setActiveTab('history')} className="text-[10px] font-black text-orange-600 uppercase tracking-widest">সব দেখুন</button>
+               <button onClick={() => setActiveTab('history')} className="text-[10px] font-black text-orange-600 uppercase tracking-widest border-b border-orange-100">সব দেখুন</button>
             </div>
             <div className="space-y-3">
                {transactions.slice(0, 4).map(t => (
-                 <div key={t.id} className="bg-white p-4 rounded-3xl border border-gray-50 flex justify-between items-center hover:border-orange-100 transition-all active:scale-[0.98]">
+                 <div key={t.id} className="transaction-list-item">
                     <div className="flex items-center gap-4">
-                       <div className={`p-3 rounded-2xl ${t.type === 'sell' ? 'bg-emerald-50 text-emerald-600' : t.type === 'buy' ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                       <div className={`icon-box-small ${t.type}`}>
                           {t.type === 'sell' ? <ArrowUpCircle size={18}/> : t.type === 'buy' ? <ArrowDownCircle size={18}/> : <MinusCircle size={18}/>}
                        </div>
                        <div>
@@ -415,39 +411,37 @@ export default function App() {
                        </div>
                     </div>
                     <div className="text-right">
-                       <p className={`font-black ${t.type === 'sell' ? 'text-emerald-600' : 'text-gray-900'}`}>{t.type === 'sell' ? '+' : '-'} ৳{t.amount}</p>
+                       <p className={`font-black ${t.type === 'sell' ? 'text-emerald-600' : 'text-gray-900'}`}>{t.type === 'sell' ? '+' : '-'} ৳{t.amount.toLocaleString()}</p>
                     </div>
                  </div>
                ))}
             </div>
 
-            <button onClick={() => setUserRole('guest')} className="w-full py-4 text-rose-500 font-black text-xs uppercase tracking-widest border-2 border-rose-50 rounded-3xl hover:bg-rose-50 transition-colors flex items-center justify-center gap-2">
+            <button onClick={() => setUserRole('guest')} className="logout-btn-full">
                <LogOut size={14}/> লগআউট করুন
             </button>
           </div>
         )}
 
-        {/* FORMS VIEW */}
+        {/* TRANSACTION FORMS */}
         {(activeTab === 'sell' || activeTab === 'buy' || activeTab === 'expense') && (
           <div className="animate-in slide-in-from-bottom-6 duration-500">
             <Section title={`${activeTab === 'sell' ? 'বিক্রি' : activeTab === 'buy' ? 'মাল কেনা' : 'খরচ'} সেকশন`} icon={Target}>
                <form onSubmit={handleSubmit} className="space-y-6">
-                  
-                  {/* Basic Info Grid */}
                   <div className="grid grid-cols-2 gap-4">
                      <ModernInput label="তারিখ" type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} required icon={Calendar} />
                      <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">ধরণ</label>
-                        <select value={formData.eggType} onChange={e => setFormData(p => ({ ...p, eggType: e.target.value }))} className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-2xl font-black text-sm outline-none transition-all">
+                        <select value={formData.eggType} onChange={e => setFormData(p => ({ ...p, eggType: e.target.value }))} className="form-select-modern">
                            {EGG_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
                         </select>
                      </div>
                   </div>
 
                   {activeTab === 'sell' && (
-                     <div className="flex bg-gray-100 p-1 rounded-2xl border border-gray-100">
-                        <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'retail' }))} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formData.saleCategory === 'retail' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-400'}`}>খুচরা</button>
-                        <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'wholesale' }))} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formData.saleCategory === 'wholesale' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-400'}`}>পাইকারি</button>
+                     <div className="sale-category-toggle">
+                        <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'retail' }))} className={`toggle-btn ${formData.saleCategory === 'retail' ? 'active' : ''}`}>খুচরা</button>
+                        <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'wholesale' }))} className={`toggle-btn ${formData.saleCategory === 'wholesale' ? 'active' : ''}`}>পাইকারি</button>
                      </div>
                   )}
 
@@ -457,7 +451,7 @@ export default function App() {
                          <ModernInput label="পরিমাণ" type="number" value={formData.quantity} onChange={e => setFormData(p => ({ ...p, quantity: e.target.value }))} placeholder="0" required icon={PlusCircle} />
                          <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">একক</label>
-                            <select value={formData.unit} onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} disabled={activeTab === 'buy' || formData.saleCategory === 'wholesale'} className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-2xl font-black text-sm outline-none transition-all disabled:opacity-50">
+                            <select value={formData.unit} onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} disabled={activeTab === 'buy' || formData.saleCategory === 'wholesale'} className="form-select-modern disabled:opacity-50">
                                {Object.entries(SELL_UNITS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                             </select>
                          </div>
@@ -468,7 +462,7 @@ export default function App() {
                          <ModernInput label={activeTab === 'sell' ? "কাস্টমার" : "মহাজন"} value={formData.customerName} onChange={e => setFormData(p => ({ ...p, customerName: e.target.value }))} placeholder="নাম..." required={activeTab === 'buy' || formData.saleCategory === 'wholesale'} icon={User} />
                       </div>
 
-                      <div className="p-6 bg-orange-600 rounded-3xl shadow-xl shadow-orange-100 flex flex-col items-center">
+                      <div className="total-bill-display-box">
                          <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] mb-1">সর্বমোট বিল</p>
                          <h3 className="text-3xl font-black text-white">৳{(parseFloat(formData.quantity || 0) * parseFloat(formData.rate || 0) - parseFloat(formData.discount || 0)).toLocaleString()}</h3>
                          <div className="w-full mt-6 bg-white/10 p-4 rounded-2xl border border-white/10">
@@ -482,7 +476,7 @@ export default function App() {
                     <div className="space-y-4">
                        <div className="flex flex-col gap-1.5">
                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">খরচের খাত</label>
-                          <select value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-2xl font-black text-sm outline-none transition-all">
+                          <select value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className="form-select-modern">
                              {EXPENSE_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
                              <option value="অন্যান্য">অন্যান্য</option>
                           </select>
@@ -491,7 +485,7 @@ export default function App() {
                     </div>
                   )}
 
-                  <button disabled={submitting} className={`w-full py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all text-white ${activeTab === 'sell' ? 'bg-emerald-600 shadow-emerald-100' : activeTab === 'buy' ? 'bg-blue-600 shadow-blue-100' : 'bg-rose-600 shadow-rose-100'}`}>
+                  <button disabled={submitting} className={`submit-action-btn ${activeTab}`}>
                     {submitting ? 'প্রসেসিং হচ্ছে...' : 'ডাটা সেভ করুন'}
                   </button>
                </form>
@@ -504,20 +498,20 @@ export default function App() {
           <div className="animate-in fade-in duration-500 space-y-4">
              <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
                 {['all', 'sell', 'buy', 'expense'].map(t => (
-                  <button key={t} onClick={() => setTypeFilter(t)} className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${typeFilter === t ? 'bg-gray-900 text-white border-gray-900 shadow-xl' : 'bg-white text-gray-400 border-gray-100'}`}>{t === 'all' ? 'সব' : t === 'sell' ? 'বিক্রি' : t === 'buy' ? 'কেনা' : 'খরচ'}</button>
+                  <button key={t} onClick={() => setTypeFilter(t)} className={`history-filter-btn ${typeFilter === t ? 'active' : ''}`}>{t === 'all' ? 'সব' : t === 'sell' ? 'বিক্রি' : t === 'buy' ? 'কেনা' : 'খরচ'}</button>
                 ))}
              </div>
 
-             <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+             <div className="register-data-table">
+                <div className="table-header-box px-6 py-5 flex justify-between items-center">
                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">লেনদেন রেজিস্টার</h3>
-                   <button onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')} className={`p-2.5 rounded-xl border transition-all ${dateFilter === 'today' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-white text-gray-400 border-gray-100'}`}><Filter size={16}/></button>
+                   <button onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')} className={`filter-icon-btn ${dateFilter === 'today' ? 'active' : ''}`}><Filter size={16}/></button>
                 </div>
                 <div className="divide-y divide-gray-50">
                    {filteredHistory.map(t => (
-                     <div key={t.id} className="p-6 flex justify-between items-center hover:bg-gray-50/50 transition-colors">
+                     <div key={t.id} className="table-row-item hover:bg-gray-50/50 transition-colors">
                         <div className="flex items-center gap-4">
-                           <div className={`w-1.5 h-10 rounded-full ${t.type === 'sell' ? 'bg-emerald-500' : t.type === 'buy' ? 'bg-blue-500' : 'bg-rose-500'}`}></div>
+                           <div className={`row-indicator-bar ${t.type}`}></div>
                            <div>
                               <h4 className="font-black text-gray-800 text-sm leading-none mb-1">{t.customerName || t.description || t.eggType}</h4>
                               <p className="text-[10px] font-bold text-gray-400 uppercase">{t.date} • {t.quantity > 0 ? `${t.quantity} ${t.unit}` : 'খরচ'}</p>
@@ -525,7 +519,7 @@ export default function App() {
                         </div>
                         <div className="text-right">
                            <p className="font-black text-gray-900 text-sm">৳{t.amount.toLocaleString()}</p>
-                           {t.dueAmount > 0 && <span className="text-[9px] font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full inline-block mt-1">বাকি ৳{t.dueAmount}</span>}
+                           {t.dueAmount > 0 && <span className="due-tag">বাকি ৳{t.dueAmount}</span>}
                         </div>
                      </div>
                    ))}
@@ -541,19 +535,19 @@ export default function App() {
              <Section title="ডিমের রেট সেটিংস" icon={Settings}>
                 <div className="space-y-6">
                    {EGG_TYPES.map(egg => (
-                     <div key={egg} className="p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
+                     <div key={egg} className="settings-rate-card p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
                         <h4 className="text-xs font-black text-gray-700 mb-4 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div> {egg}</h4>
                         <div className="grid grid-cols-3 gap-3 mb-4">
                            {['pis', 'hali', 'case'].map(u => (
                              <div key={u}>
                                 <label className="text-[8px] font-black text-gray-400 uppercase ml-1.5 mb-1 block">{u === 'pis' ? 'পিস' : u === 'hali' ? 'হালি' : 'কেস'}</label>
-                                <input type="number" value={rates.retail[egg]?.[u] || ''} onChange={e => setRates(p => ({ ...p, retail: { ...p.retail, [egg]: { ...p.retail[egg], [u]: e.target.value } } }))} className="w-full p-3 rounded-2xl border border-gray-200 font-black text-center text-xs focus:border-orange-500 outline-none transition-all" placeholder="0" />
+                                <input type="number" value={rates.retail[egg]?.[u] || ''} onChange={e => setRates(p => ({ ...p, retail: { ...p.retail, [egg]: { ...p.retail[egg], [u]: e.target.value } } }))} className="settings-rate-input" placeholder="0" />
                              </div>
                            ))}
                         </div>
                         <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
                            <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">পাইকারি দর</span>
-                           <input type="number" value={rates.wholesale[egg] || ''} onChange={e => setRates(p => ({ ...p, wholesale: { ...p.wholesale, [egg]: e.target.value } }))} className="w-24 p-2 bg-purple-50 border border-purple-100 rounded-xl font-black text-center text-xs text-purple-700 outline-none" placeholder="0" />
+                           <input type="number" value={rates.wholesale[egg] || ''} onChange={e => setRates(p => ({ ...p, wholesale: { ...p.wholesale, [egg]: e.target.value } }))} className="wholesale-input-field" placeholder="0" />
                         </div>
                      </div>
                    ))}
@@ -565,8 +559,8 @@ export default function App() {
 
       </main>
 
-      {/* Floating Bottom Nav */}
-      <nav className="bottom-nav fixed bottom-6 left-6 right-6 z-[60] flex items-center justify-around bg-white/90 backdrop-blur-2xl border border-white/20 p-2.5 rounded-[2.5rem] shadow-2xl shadow-gray-200 max-w-lg mx-auto">
+      {/* Floating Bottom Navigation Bar */}
+      <nav className="app-floating-nav">
         {[
           { id: 'dashboard', icon: LayoutDashboard },
           { id: 'buy', icon: ArrowDownCircle },
@@ -578,9 +572,9 @@ export default function App() {
           if (item.admin && userRole !== 'admin') return null;
           const isActive = activeTab === item.id;
           return (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`p-3.5 rounded-full transition-all duration-500 relative flex items-center justify-center ${isActive ? 'bg-orange-600 text-white shadow-lg shadow-orange-200 -translate-y-4' : 'text-gray-400 hover:text-gray-600'}`}>
+            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`nav-icon-item ${isActive ? 'active' : ''}`}>
                <item.icon size={22} />
-               {isActive && <div className="absolute -bottom-1.5 w-1 h-1 bg-white rounded-full"></div>}
+               {isActive && <div className="nav-indicator-dot"></div>}
             </button>
           )
         })}
@@ -589,6 +583,7 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
         
+        /* AGGRESSIVE CSS RESET - DO NOT REMOVE */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Hind Siliguri', sans-serif !important; }
         
         html, body, #root { 
@@ -596,26 +591,202 @@ export default function App() {
           min-height: 100vh !important; 
           margin: 0 !important; 
           padding: 0 !important; 
+          display: block !important; 
           background: #FDFCFB !important;
           color: #111;
-          place-items: initial !important;
+          place-items: initial !important; /* Vite Override */
+          text-align: left !important;
+          overflow-x: hidden;
         }
+
+        .app-main-wrapper {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
+        .app-content-area {
+          width: 100%;
+          max-width: 600px;
+          margin: 0 auto;
+        }
+
+        /* Modern UI Elements */
+        .app-global-header {
+          width: 100%;
+          position: sticky;
+          top: 0;
+          z-index: 50;
+          background: rgba(255,255,255,0.85);
+          backdrop-filter: blur(24px);
+          border-bottom: 1px solid #f0f0f0;
+          padding: 1.25rem 0;
+        }
+
+        .header-container-inner {
+          width: 100%;
+          max-width: 600px;
+          margin: 0 auto;
+        }
+
+        .header-icon-box {
+          padding: 0.6rem;
+          border-radius: 1.25rem;
+        }
+
+        .profit-card-highlight {
+          background: #111827;
+          background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+          border-radius: 2.5rem;
+          padding: 2rem;
+          color: white;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .transaction-list-item {
+          background: white;
+          padding: 1rem;
+          border-radius: 1.5rem;
+          border: 1px solid #f5f5f5;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          transition: all 0.2s;
+        }
+
+        .icon-box-small { padding: 0.75rem; border-radius: 1rem; }
+        .icon-box-small.sell { background: #f0fdf4; color: #16a34a; }
+        .icon-box-small.buy { background: #eff6ff; color: #2563eb; }
+        .icon-box-small.expense { background: #fef2f2; color: #dc2626; }
+
+        .logout-btn-full {
+          width: 100%;
+          padding: 1.25rem;
+          margin-top: 1.5rem;
+          border-radius: 1.5rem;
+          border: 2px solid #fff1f2;
+          background: none;
+          color: #f43f5e;
+          font-weight: 900;
+          font-size: 0.75rem;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 0.5rem;
+          transition: background 0.2s;
+        }
+
+        /* Form Styling */
+        .form-select-modern {
+          width: 100%;
+          padding: 0.875rem 1rem;
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 1.25rem;
+          font-weight: 900;
+          font-size: 0.875rem;
+          outline: none;
+        }
+
+        .sale-category-toggle {
+          display: flex;
+          background: #f3f4f6;
+          padding: 0.375rem;
+          border-radius: 1.25rem;
+          border: 1px solid #e5e7eb;
+        }
+        .toggle-btn {
+          flex: 1;
+          padding: 0.75rem;
+          border-radius: 1rem;
+          font-size: 0.75rem;
+          font-weight: 900;
+          text-transform: uppercase;
+          border: none;
+          background: none;
+          color: #9ca3af;
+          transition: all 0.2s;
+        }
+        .toggle-btn.active {
+          background: white;
+          color: #ea580c;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .total-bill-display-box {
+          background: #ea580c;
+          background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+          border-radius: 2rem;
+          padding: 1.5rem;
+          text-align: center;
+          box-shadow: 0 10px 15px -3px rgba(234, 88, 12, 0.3);
+        }
+
+        .submit-action-btn {
+          width: 100%;
+          padding: 1.25rem;
+          border-radius: 1.5rem;
+          border: none;
+          color: white;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .submit-action-btn.sell { background: #16a34a; }
+        .submit-action-btn.buy { background: #2563eb; }
+        .submit-action-btn.expense { background: #dc2626; }
+
+        /* Login Overlay Styling */
+        .login-overlay-full { position: fixed; inset: 0; z-index: 100; background: white; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+        .login-content-box { width: 100%; max-width: 320px; text-align: center; }
+        .login-icon-circle { background: #fff7ed; color: #ea580c; width: 80px; height: 80px; border-radius: 2rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
+        .login-field-input { width: 100%; padding: 1.25rem; background: #f9fafb; border: 2px solid #f3f4f6; border-radius: 1.5rem; text-align: center; font-size: 2rem; font-weight: 900; letter-spacing: 0.5rem; outline: none; }
+        .login-action-btn { width: 100%; padding: 1.25rem; background: #111827; color: white; border: none; border-radius: 1.5rem; font-weight: 900; margin-top: 1rem; }
+
+        /* Floating Nav Bar */
+        .app-floating-nav {
+          position: fixed;
+          bottom: 1.5rem;
+          left: 50%;
+          transform: translateX(-50%);
+          width: calc(100% - 3rem);
+          max-width: 450px;
+          background: rgba(255,255,255,0.9);
+          backdrop-filter: blur(24px);
+          border: 1px solid rgba(0,0,0,0.05);
+          padding: 0.75rem;
+          border-radius: 2.5rem;
+          display: flex;
+          justify-content: space-around;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+          z-index: 60;
+        }
+        .nav-icon-item { border: none; background: none; color: #9ca3af; padding: 0.75rem; border-radius: 1.5rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
+        .nav-icon-item.active { background: #ea580c; color: white; transform: translateY(-1.25rem) scale(1.1); box-shadow: 0 10px 15px -3px rgba(234, 88, 12, 0.3); }
+        .nav-indicator-dot { position: absolute; bottom: -0.5rem; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background: white; border-radius: 50%; }
+
+        /* Tables & History */
+        .history-filter-btn { padding: 0.625rem 1.25rem; border-radius: 1rem; border: 1px solid #f3f4f6; background: white; color: #9ca3af; font-size: 0.75rem; font-weight: 900; text-transform: uppercase; }
+        .history-filter-btn.active { background: #111827; color: white; border-color: #111827; }
+        .register-data-table { background: white; border-radius: 2rem; border: 1px solid #f0f0f0; overflow: hidden; }
+        .table-row-item { padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f9fafb; }
+        .row-indicator-bar { width: 4px; height: 2.5rem; border-radius: 2px; }
+        .row-indicator-bar.sell { background: #10b981; }
+        .row-indicator-bar.buy { background: #3b82f6; }
+        .row-indicator-bar.expense { background: #ef4444; }
+        .due-tag { background: #fff1f2; color: #f43f5e; font-size: 0.625rem; font-weight: 900; padding: 0.125rem 0.5rem; border-radius: 1rem; margin-top: 0.25rem; display: inline-block; }
+
+        /* Settings */
+        .settings-rate-input { width: 100%; padding: 0.75rem; border-radius: 1rem; border: 1px solid #e5e7eb; text-align: center; font-weight: 900; font-size: 0.875rem; outline: none; }
+        .wholesale-input-field { width: 6rem; padding: 0.5rem; border-radius: 0.75rem; border: 1px solid #ddd; font-weight: 900; text-align: center; }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        input[type="date"]::-webkit-calendar-picker-indicator {
-          background: transparent;
-          bottom: 0;
-          color: transparent;
-          cursor: pointer;
-          left: 0;
-          position: absolute;
-          right: 0;
-          top: 0;
-          width: auto;
-          height: auto;
-        }
       `}</style>
     </div>
   );

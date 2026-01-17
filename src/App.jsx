@@ -70,7 +70,7 @@ const SELL_UNITS = {
   'soto': { label: 'শত (১০০)', value: 100 }
 };
 
-// --- Components ---
+// --- Reusable Components ---
 
 const Input = ({ label, type = "text", value, onChange, placeholder, required = false, readOnly = false, className = "", icon: Icon }) => (
   <div className={`mb-4 ${className}`}>
@@ -487,60 +487,63 @@ export default function App() {
       </nav>
 
       <style>{`
-        /* Reset and Base Styles - Override Vite defaults */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* Aggressive CSS Reset */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif !important; }
+        
         html, body, #root { 
           width: 100% !important; 
           height: 100% !important; 
+          min-height: 100vh !important;
           margin: 0 !important; 
           padding: 0 !important; 
           display: block !important; 
-          place-items: initial !important; 
           text-align: left !important;
-          background: #FDFCFB;
-          color: #1a1a1a;
-          font-family: 'Hind Siliguri', system-ui, sans-serif;
+          background: #FDFCFB !important;
+          overflow-x: hidden;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
         }
 
-        .app-container { width: 100%; display: flex; flex-direction: column; }
+        /* Prevent broken character issues */
+        body { line-height: 1.6; }
+
+        .app-container { width: 100%; min-height: 100vh; position: relative; }
         
-        /* Utility */
         .no-scrollbar::-webkit-scrollbar { display: none; }
 
-        /* Custom Header */
-        .main-header { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); border-b: 1px solid #f0f0f0; padding: 1rem; }
+        .main-header { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); border-b: 1px solid #f0f0f0; padding: 1rem; width: 100%; }
         .header-content { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-        .header-icon { background: #ea580c; color: white; padding: 0.5rem; rounded-xl shadow-lg; }
+        .header-icon { background: #ea580c; color: white; padding: 0.5rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; }
 
-        /* Banner */
         .profit-banner { background: #ea580c; color: white; padding: 1.5rem; border-radius: 1.5rem; box-shadow: 0 10px 20px rgba(234, 88, 12, 0.2); }
 
-        /* List Items */
         .transaction-item { background: white; padding: 1rem; border-radius: 1rem; border: 1px solid #f5f5f5; display: flex; justify-content: space-between; align-items: center; }
         .t-icon { padding: 0.5rem; border-radius: 0.75rem; }
         .t-icon.sell { background: #f0fdf4; color: #16a34a; }
         .t-icon.buy { background: #eff6ff; color: #2563eb; }
         .t-icon.expense { background: #fef2f2; color: #dc2626; }
 
-        /* Login */
         .login-overlay { position: fixed; inset: 0; z-index: 100; background: white; display: flex; align-items: center; justify-content: center; padding: 2rem; }
         .login-card { text-align: center; width: 100%; max-width: 320px; }
-        .login-card h1 { font-size: 2rem; font-weight: 900; }
+        .login-card h1 { font-size: 2rem; font-weight: 900; margin-bottom: 0.5rem; }
         .login-card input { width: 100%; padding: 1rem; background: #f9f9f9; border: 2px solid #f0f0f0; border-radius: 1rem; margin-top: 2rem; text-align: center; font-size: 1.5rem; font-weight: 900; letter-spacing: 0.5rem; outline: none; }
         .login-card button { width: 100%; padding: 1rem; background: #ea580c; color: white; font-weight: 900; border: none; border-radius: 1rem; margin-top: 1rem; cursor: pointer; }
 
-        /* Bottom Nav */
-        .bottom-nav { position: fixed; bottom: 1.5rem; left: 1.25rem; right: 1.25rem; background: rgba(255,255,255,0.9); backdrop-filter: blur(20px); border: 1px solid rgba(0,0,0,0.05); padding: 0.75rem; border-radius: 2rem; display: flex; justify-content: space-around; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 60; }
-        .nav-item { border: none; background: none; color: #ccc; padding: 0.5rem; cursor: pointer; transition: all 0.2s; }
+        .bottom-nav { position: fixed; bottom: 1.5rem; left: 1.25rem; right: 1.25rem; background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); border: 1px solid rgba(0,0,0,0.05); padding: 0.75rem; border-radius: 2rem; display: flex; justify-content: space-around; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 60; max-width: 500px; margin: 0 auto; }
+        .nav-item { border: none; background: none; color: #cbd5e1; padding: 0.5rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
         .nav-item.active { color: #ea580c; transform: translateY(-5px); }
 
-        /* Form */
         .form-card { background: white; padding: 1.5rem; border-radius: 2rem; border: 1px solid #f0f0f0; }
-        .submit-btn { width: 100%; padding: 1.25rem; border-radius: 1.25rem; font-weight: 900; color: white; border: none; cursor: pointer; margin-top: 1.5rem; }
+        .submit-btn { width: 100%; padding: 1.25rem; border-radius: 1.25rem; font-weight: 900; color: white; border: none; cursor: pointer; margin-top: 1.5rem; transition: transform 0.1s; }
+        .submit-btn:active { transform: scale(0.98); }
         .submit-btn.sell { background: #16a34a; }
         .submit-btn.buy { background: #2563eb; }
         .submit-btn.expense { background: #dc2626; }
       `}</style>
+      
+      {/* Import Font with fallback */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;700&display=swap" />
     </div>
   );

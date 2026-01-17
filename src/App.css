@@ -1,42 +1,177 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
+/* --- Sidebar & Layout --- */
+.web-system-container {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+}
+
+.sidebar-container {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  background: #fff;
+  border-right: 1px solid #f0f0f0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 10px 0 30px rgba(0, 0, 0, 0.02);
+}
+
+.sidebar-container.expanded { width: 260px; }
+.sidebar-container.collapsed { width: 80px; }
+
+.sidebar-inner-scroll {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+}
+
+.main-content-wrapper {
+  flex: 1;
+  transition: padding-left 0.3s;
+  width: 100%;
+}
+
+.sidebar-expanded { padding-left: 260px; }
+.sidebar-collapsed { padding-left: 80px; }
+
+/* --- Top Navbar --- */
+.top-navbar-fixed {
+  height: 80px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+}
+
+/* --- Components --- */
+.profit-card-highlight {
+  background: #111827;
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+  border-radius: 2.5rem;
   padding: 2rem;
+  color: white;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.web-input, .modern-select-web, .form-select-modern {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 1.25rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.web-input:focus, .modern-select-web:focus {
+  border-color: #EA580C;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(234, 88, 12, 0.05);
+}
+
+.total-bill-display-box {
+  background: #ea580c;
+  background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+  border-radius: 2rem;
+  padding: 1.5rem;
   text-align: center;
+  box-shadow: 0 10px 15px -3px rgba(234, 88, 12, 0.3);
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* --- Tables --- */
+.web-data-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.web-data-table th {
+  padding: 1rem;
+  font-size: 10px;
+  font-weight: 900;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid #f3f4f6;
+  text-align: left;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.web-data-table td {
+  padding: 1.25rem 1rem;
+  border-bottom: 1px solid #f9fafb;
 }
 
-.card {
-  padding: 2em;
+.type-tag {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
-.read-the-docs {
-  color: #888;
+.type-tag.sell { background: #ecfdf5; color: #10b981; }
+.type-tag.buy { background: #eff6ff; color: #2563eb; }
+.type-tag.expense { background: #fef2f2; color: #ef4444; }
+
+/* --- Buttons --- */
+.voucher-submit-btn {
+  width: 100%;
+  padding: 1.25rem;
+  border-radius: 1.25rem;
+  border: none;
+  color: #fff;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.voucher-submit-btn.sell { background: #10b981; }
+.voucher-submit-btn.buy { background: #2563eb; }
+.voucher-submit-btn.expense { background: #ef4444; }
+
+.history-pill {
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.history-pill.active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+/* --- Animations --- */
+.animate-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1024px) {
+  .sidebar-container { transform: translateX(-100%); }
+  .main-content-wrapper { padding-left: 0 !important; }
 }

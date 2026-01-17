@@ -29,7 +29,6 @@ import {
   ArrowUpCircle,
   MinusCircle,
   Lock,
-  Unlock,
   LogOut,
   ShieldCheck,
   User,
@@ -41,12 +40,14 @@ import {
   Store,
   Calendar,
   AlertCircle,
-  CreditCard,
+  Menu,
+  X,
+  ChevronDown,
+  DollarSign,
   Target
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
-// Note: Keeping your current credentials
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
   ? JSON.parse(__firebase_config) 
   : {
@@ -75,7 +76,70 @@ const SELL_UNITS = {
   'soto': { label: 'শত (১০০)', value: 100 }
 };
 
-// --- Reusable Modern Components ---
+// --- Web Components (Moved to top to prevent ReferenceErrors) ---
+
+const SidebarLink = ({ id, icon: Icon, label, activeTab, setActiveTab }) => (
+  <button
+    onClick={() => setActiveTab(id)}
+    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+      activeTab === id 
+      ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' 
+      : 'text-gray-500 hover:bg-orange-50 hover:text-orange-600'
+    }`}
+  >
+    <Icon size={20} className={`${activeTab === id ? 'text-white' : 'text-gray-400 group-hover:text-orange-500'}`} />
+    <span className="font-bold text-sm tracking-wide">{label}</span>
+  </button>
+);
+
+const WebCard = ({ title, children, icon: Icon, action }) => (
+  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full flex flex-col">
+    {title && (
+      <div className="px-6 py-4 border-b border-gray-50 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon size={18} className="text-orange-500" />}
+          <h3 className="text-sm font-black text-gray-700 uppercase tracking-widest">{title}</h3>
+        </div>
+        {action && action}
+      </div>
+    )}
+    <div className="p-6 flex-1">{children}</div>
+  </div>
+);
+
+const MetricCardWeb = ({ title, value, subValue, icon: Icon, colorClass, blurred = false }) => (
+  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex items-center gap-5">
+    <div className={`p-4 rounded-xl ${colorClass}`}>
+      <Icon size={24} />
+    </div>
+    <div className="flex flex-col">
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">{title}</p>
+      {blurred ? (
+        <div className="flex items-center gap-2">
+          <div className="text-2xl font-black text-gray-100 blur-sm select-none tracking-tighter">XXXXX</div>
+          <Lock size={14} className="text-gray-300" />
+        </div>
+      ) : (
+        <>
+          <h2 className="text-2xl font-black text-gray-900 leading-none">{value}</h2>
+          {subValue && <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase">{subValue}</p>}
+        </>
+      )}
+    </div>
+  </div>
+);
+
+const MetricBoxWeb = ({ title, value, icon: Icon, colorClass }) => (
+  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-5">
+    <div className={`p-4 rounded-xl ${colorClass}`}>
+      <Icon size={24} />
+    </div>
+    <div className="flex flex-col">
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">{title}</p>
+      <h2 className="text-2xl font-black text-gray-900 leading-none">{value}</h2>
+    </div>
+  </div>
+);
 
 const Section = ({ title, icon: Icon, children, className = "" }) => (
   <div className={`bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6 ${className}`}>
@@ -105,28 +169,6 @@ const ModernInput = ({ label, type = "text", value, onChange, placeholder, requi
   </div>
 );
 
-const MetricBox = ({ title, value, subValue, icon: Icon, colorClass, blurred = false }) => (
-  <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-    <div className={`p-3 rounded-2xl transition-transform group-hover:scale-110 ${colorClass}`}>
-      <Icon size={20} />
-    </div>
-    <div className="flex flex-col">
-      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 leading-none">{title}</span>
-      {blurred ? (
-        <div className="flex items-center gap-1">
-          <div className="text-lg font-black text-gray-200 blur-sm select-none">৳৳৳৳</div>
-          <Lock size={12} className="text-gray-300"/>
-        </div>
-      ) : (
-        <div className="flex flex-col">
-          <div className="text-lg font-black text-gray-900 leading-none">{value}</div>
-          {subValue && <div className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">{subValue}</div>}
-        </div>
-      )}
-    </div>
-  </div>
-);
-
 // --- Main App ---
 
 export default function App() {
@@ -137,6 +179,7 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false);
   const [userRole, setUserRole] = useState('guest'); 
   const [passwordInput, setPasswordInput] = useState('');
+  const [isSidebarOpen, setSidebarOpen] = useState(true);
 
   const [adminPassword, setAdminPassword] = useState('665911');
   const [subAdminPassword, setSubAdminPassword] = useState('1234');
@@ -162,20 +205,21 @@ export default function App() {
     date: new Date().toISOString().split('T')[0]
   });
 
-  // --- Auth & Data Flow ---
+  // --- Auth ---
   useEffect(() => {
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           try { await signInWithCustomToken(auth, __initial_auth_token); } catch (e) { await signInAnonymously(auth); }
         } else { await signInAnonymously(auth); }
-      } catch (err) { console.error("Firebase Auth Error:", err); }
+      } catch (err) { console.error(err); }
     };
     initAuth();
     const unsub = onAuthStateChanged(auth, setUser);
     return () => unsub();
   }, []);
 
+  // --- Data Fetching ---
   useEffect(() => {
     if (!user) return;
     const qTr = collection(db, 'artifacts', appId, 'users', user.uid, 'egg_transactions_v2');
@@ -200,7 +244,7 @@ export default function App() {
     return () => { unsubTr(); unsubRates(); unsubAuth(); };
   }, [user]);
 
-  // Rate Automation Logic
+  // --- Automation ---
   useEffect(() => {
     if (formData.type === 'sell' && rates) {
       if (formData.saleCategory === 'wholesale') {
@@ -211,13 +255,11 @@ export default function App() {
     }
   }, [formData.saleCategory, formData.eggType, formData.unit, formData.type, rates]);
 
-  // Statistics Calculation
+  // --- Calculations ---
   const stats = useMemo(() => {
     let stock = { 'লাল ডিম': 0, 'সাদা ডিম': 0, 'হাঁসের ডিম': 0 };
     let cash = 0, custDue = 0, suppDue = 0, todaySales = 0, todayProfit = 0, todayExp = 0;
     const todayStr = new Date().toISOString().split('T')[0];
-    
-    // Average cost estimation (In a real app, this would be calculated from purchases)
     let costs = { 'লাল ডিম': 10, 'সাদা ডিম': 9, 'হাঁসের ডিম': 12 };
 
     transactions.forEach(t => {
@@ -259,7 +301,7 @@ export default function App() {
     });
   }, [transactions, dateFilter, typeFilter]);
 
-  // Handlers
+  // --- Handlers ---
   const handleLogin = (e) => {
     e.preventDefault();
     if (passwordInput === adminPassword) setUserRole('admin');
@@ -287,352 +329,467 @@ export default function App() {
       await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'egg_transactions_v2'), {
         ...formData, amount: total, paidAmount: paid, dueAmount: due, quantityInPieces: qtyP, createdAt: new Date().toISOString()
       });
-      alert('সফলভাবে সেভ হয়েছে!');
+      alert('Success!');
       setActiveTab('dashboard');
-      setFormData(prev => ({ ...prev, quantity: '', paidAmount: '', customerName: '', description: '', discount: '' }));
-    } catch (err) { alert('সমস্যা হয়েছে!'); }
+    } catch (err) { alert('Error!'); }
     finally { setSubmitting(false); }
   };
 
   if (loading) return (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-[#FDFCFB]">
-      <div className="relative w-16 h-16">
-         <div className="absolute inset-0 border-4 border-orange-100 rounded-full"></div>
-         <div className="absolute inset-0 border-4 border-orange-500 rounded-full border-t-transparent animate-spin"></div>
+    <div className="h-screen w-full flex items-center justify-center bg-gray-50">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
+        <p className="text-orange-600 font-bold tracking-widest text-xs uppercase">System Initializing...</p>
       </div>
-      <p className="mt-4 text-orange-500 font-black uppercase tracking-widest text-[10px]">Loading Nishad Agro</p>
     </div>
   );
 
   return (
-    <div className="app-main-wrapper">
+    <div className="min-h-screen bg-gray-50 flex">
       
-      {/* Login Screen */}
+      {/* --- Login Component (Enterprise Style) --- */}
       {userRole === 'guest' && (
-        <div className="login-overlay-full">
-          <div className="login-content-box">
-            <div className="login-icon-circle"><Egg size={44} /></div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tighter mb-1">নিশাদ এগ্রো</h1>
-            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mb-8">Management System Pro</p>
-            <form onSubmit={handleLogin} className="w-full space-y-4">
-              <input 
-                type="password" 
-                placeholder="পাসওয়ার্ড লিখুন" 
-                value={passwordInput} 
-                onChange={(e) => setPasswordInput(e.target.value)} 
-                className="login-field-input"
-                autoFocus
-              />
-              <button className="login-action-btn">প্রবেশ করুন</button>
+        <div className="fixed inset-0 z-[100] bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-10 text-center">
+            <div className="w-20 h-20 bg-orange-600 text-white rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <Egg size={40} />
+            </div>
+            <h1 className="text-3xl font-black text-gray-900 mb-1">নিশাদ এগ্রো</h1>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mb-10">Web Management System</p>
+            <form onSubmit={handleLogin} className="space-y-4 text-left">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">পাসওয়ার্ড দিন</label>
+                <input 
+                  type="password" 
+                  value={passwordInput}
+                  onChange={e => setPasswordInput(e.target.value)}
+                  className="w-full py-4 px-6 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-orange-500 outline-none text-2xl font-black tracking-[0.5em] text-center"
+                  placeholder="••••"
+                  autoFocus
+                />
+              </div>
+              <button className="w-full py-4 bg-gray-900 text-white font-black rounded-2xl shadow-xl hover:bg-gray-800 transition-all">প্রবেশ করুন</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Persistent Header */}
-      <header className="app-global-header">
-        <div className="header-container-inner flex justify-between items-center px-6">
-          <div className="flex items-center gap-3">
-             <div className="header-icon-box bg-orange-600 shadow-xl shadow-orange-100 text-white">
-                <Egg size={22} />
-             </div>
-             <div>
-                <h1 className="text-lg font-black text-gray-900 leading-none">নিশাদ এগ্রো</h1>
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">Habbiganj, BD</p>
-             </div>
+      {/* --- SIDEBAR (Desktop Web Nav) --- */}
+      <aside className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-100 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-0 -translate-x-full lg:w-20 lg:translate-x-0 overflow-hidden'}`}>
+        <div className="h-full flex flex-col p-4">
+          <div className="flex items-center gap-3 px-2 mb-10 mt-2 overflow-hidden">
+            <div className="min-w-[40px] h-10 bg-orange-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-orange-100">
+              <Egg size={22} />
+            </div>
+            <h2 className={`font-black text-lg transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}>নিশাদ এগ্রো</h2>
           </div>
-          <div className="bg-orange-50 px-4 py-2 rounded-2xl border border-orange-100 text-right">
-             <p className="text-[8px] font-black text-orange-400 uppercase tracking-widest mb-0.5">লাইভ ক্যাশ</p>
-             <p className="text-lg font-black text-orange-600 leading-none">৳{stats.cash.toLocaleString()}</p>
+
+          <div className="flex-1 space-y-2">
+            <SidebarLink id="dashboard" icon={LayoutDashboard} label="ড্যাশবোর্ড" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <div className="pt-4 pb-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest overflow-hidden">লেনদেন</div>
+            <SidebarLink id="sell" icon={ArrowUpCircle} label="ডিম বিক্রি" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <SidebarLink id="buy" icon={ArrowDownCircle} label="ডিম ক্রয়" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <SidebarLink id="expense" icon={Wallet} label="খরচ এন্ট্রি" activeTab={activeTab} setActiveTab={setActiveTab} />
+            
+            <div className="pt-4 pb-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest overflow-hidden">রিপোর্ট</div>
+            <SidebarLink id="history" icon={History} label="লেনদেন ইতিহাস" activeTab={activeTab} setActiveTab={setActiveTab} />
+            
+            {userRole === 'admin' && (
+              <>
+                <div className="pt-4 pb-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest overflow-hidden">অ্যাডমিন</div>
+                <SidebarLink id="settings" icon={Settings} label="সিস্টেম সেটিংস" activeTab={activeTab} setActiveTab={setActiveTab} />
+              </>
+            )}
           </div>
+
+          <button onClick={() => setUserRole('guest')} className="mt-auto flex items-center gap-3 px-4 py-3 rounded-xl text-rose-500 font-bold hover:bg-rose-50 transition-all">
+            <LogOut size={20} />
+            <span className={isSidebarOpen ? 'block' : 'hidden'}>লগআউট</span>
+          </button>
         </div>
-      </header>
+      </aside>
 
-      <main className="app-content-area px-6 py-8 pb-32">
+      {/* --- MAIN CONTENT AREA --- */}
+      <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'lg:pl-64' : 'lg:pl-20'}`}>
         
-        {/* DASHBOARD VIEW */}
-        {activeTab === 'dashboard' && (
-          <div className="animate-in fade-in duration-500 space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-               <MetricBox title="মার্কেট বাকি" value={`৳${stats.custDue.toLocaleString()}`} icon={Users} colorClass="bg-emerald-50 text-emerald-600" />
-               <MetricBox title="মহাজন পাবে" value={`৳${stats.suppDue.toLocaleString()}`} icon={User} colorClass="bg-rose-50 text-rose-600" />
+        {/* --- Top Navbar --- */}
+        <header className="h-20 bg-white border-b border-gray-100 sticky top-0 z-40 flex items-center justify-between px-8">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-gray-100 rounded-xl transition-all">
+              <Menu size={24} className="text-gray-500" />
+            </button>
+            <h1 className="text-lg font-black text-gray-800 uppercase tracking-widest">
+              {activeTab === 'dashboard' ? 'Overview' : activeTab === 'sell' ? 'Sales Management' : activeTab === 'buy' ? 'Purchase' : 'Settings'}
+            </h1>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <div className="hidden md:flex flex-col text-right">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">বর্তমান ক্যাশ</p>
+              <p className="text-xl font-black text-orange-600 leading-none">৳{stats.cash.toLocaleString()}</p>
             </div>
+            <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center border-2 border-white shadow-sm ring-1 ring-gray-100 overflow-hidden">
+               <User size={20} className="text-gray-400" />
+            </div>
+          </div>
+        </header>
 
-            <Section title="ইনভেন্টরি রিপোর্ট" icon={Store}>
-               <div className="space-y-5">
-                 {EGG_TYPES.map((egg, idx) => (
-                   <div key={egg} className="flex flex-col gap-2">
-                     <div className="flex justify-between items-end px-1">
-                        <span className="text-xs font-black text-gray-700">{egg}</span>
-                        <span className="text-xs font-black text-gray-900">{stats.stock[egg]} পিস</span>
-                     </div>
-                     <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-1000 ${idx === 0 ? 'bg-red-500' : idx === 1 ? 'bg-gray-400' : 'bg-blue-500'}`} 
-                          style={{ width: `${Math.min(100, (stats.stock[egg] / 5000) * 100)}%` }}
-                        ></div>
-                     </div>
+        <main className="p-8 max-w-7xl mx-auto">
+
+          {/* --- DASHBOARD VIEW --- */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <MetricCardWeb title="মার্কেট বাকি" value={`৳${stats.custDue.toLocaleString()}`} icon={Users} colorClass="bg-blue-50 text-blue-600" />
+                <MetricBoxWeb title="মোট ক্যাশ" value={`৳${stats.cash.toLocaleString()}`} icon={DollarSign} colorClass="bg-orange-50 text-orange-600" />
+                <MetricBoxWeb title="মহাজন পাবে" value={`৳${stats.suppDue.toLocaleString()}`} icon={AlertCircle} colorClass="bg-rose-50 text-rose-600" />
+                <MetricCardWeb title="আজকের লাভ" value={`৳${stats.todayProfit.toLocaleString()}`} icon={TrendingUp} colorClass="bg-emerald-50 text-emerald-600" blurred={userRole !== 'admin'} />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2">
+                  <WebCard title="ইনভেন্টরি রিপোর্ট" icon={Store}>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {EGG_TYPES.map((egg, idx) => (
+                        <div key={egg} className="p-6 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col items-center text-center">
+                          <Egg size={32} className={`${idx === 0 ? 'text-red-500' : idx === 1 ? 'text-gray-400' : 'text-blue-500'} mb-4`} />
+                          <h4 className="font-black text-sm text-gray-700 mb-1">{egg}</h4>
+                          <p className="text-3xl font-black text-gray-900 leading-none">{stats.stock[egg]}</p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase mt-2 tracking-widest">বর্তমান পিস</p>
+                        </div>
+                      ))}
+                    </div>
+                  </WebCard>
+                </div>
+
+                <WebCard title="সিস্টেম স্ট্যাটাস" icon={ShieldCheck}>
+                   <div className="space-y-4">
+                      <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                        <span className="text-xs font-bold text-gray-500 uppercase">আজকের বিক্রি</span>
+                        <span className="font-black text-gray-800">৳{stats.todaySales}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                        <span className="text-xs font-bold text-gray-500 uppercase">আজকের খরচ</span>
+                        <span className="font-black text-rose-500">৳{stats.todayExp}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-xl">
+                        <span className="text-xs font-bold text-emerald-600 uppercase">সার্ভার স্ট্যাটাস</span>
+                        <span className="text-[10px] font-black text-emerald-600 uppercase bg-white px-2 py-1 rounded-lg">Online</span>
+                      </div>
                    </div>
-                 ))}
-               </div>
-            </Section>
+                </WebCard>
+              </div>
 
-            <div className="profit-card-highlight">
-               <div className="relative z-10 flex justify-between items-end">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-400 mb-2">আজকের নিট প্রফিট</p>
-                    {userRole === 'admin' ? (
-                      <h2 className="text-4xl font-black tracking-tight">৳{stats.todayProfit.toLocaleString()}</h2>
-                    ) : (
-                      <div className="flex items-center gap-2"><span className="text-3xl font-black blur-md select-none tracking-tighter text-white/50">৳৳৳৳৳</span><Lock size={18} className="text-orange-500/50" /></div>
-                    )}
-                  </div>
-                  <div className="text-right border-l border-white/10 pl-6">
-                    <p className="text-[9px] uppercase font-black text-gray-500 mb-1 tracking-widest">মোট বিক্রি</p>
-                    <p className="text-xl font-black text-orange-500">৳{stats.todaySales.toLocaleString()}</p>
-                  </div>
-               </div>
-            </div>
-
-            <div className="flex items-center justify-between px-1 pt-4">
-               <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest flex items-center gap-2"><History size={14}/> সাম্প্রতিক লেনদেন</h3>
-               <button onClick={() => setActiveTab('history')} className="text-[10px] font-black text-orange-600 uppercase tracking-widest border-b border-orange-100">সব দেখুন</button>
-            </div>
-            <div className="space-y-3">
-               {transactions.slice(0, 4).map(t => (
-                 <div key={t.id} className="transaction-list-item">
-                    <div className="flex items-center gap-4">
-                       <div className={`icon-box-small ${t.type}`}>
-                          {t.type === 'sell' ? <ArrowUpCircle size={18}/> : t.type === 'buy' ? <ArrowDownCircle size={18}/> : <MinusCircle size={18}/>}
-                       </div>
-                       <div>
-                          <h4 className="text-sm font-black text-gray-800 leading-none mb-1">{t.customerName || t.description || t.eggType}</h4>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{t.type === 'sell' ? `${t.quantity} ${SELL_UNITS[t.unit]?.label}` : t.date}</p>
-                       </div>
-                    </div>
-                    <div className="text-right">
-                       <p className={`font-black ${t.type === 'sell' ? 'text-emerald-600' : 'text-gray-900'}`}>{t.type === 'sell' ? '+' : '-'} ৳{t.amount.toLocaleString()}</p>
-                    </div>
-                 </div>
-               ))}
-            </div>
-
-            <button onClick={() => setUserRole('guest')} className="logout-btn-full">
-               <LogOut size={14}/> লগআউট করুন
-            </button>
-          </div>
-        )}
-
-        {/* TRANSACTION FORMS */}
-        {(activeTab === 'sell' || activeTab === 'buy' || activeTab === 'expense') && (
-          <div className="animate-in slide-in-from-bottom-6 duration-500">
-            <Section title={`${activeTab === 'sell' ? 'বিক্রি' : activeTab === 'buy' ? 'মাল কেনা' : 'খরচ'} সেকশন`} icon={Target}>
-               <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                     <ModernInput label="তারিখ" type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} required icon={Calendar} />
-                     <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">ধরণ</label>
-                        <select value={formData.eggType} onChange={e => setFormData(p => ({ ...p, eggType: e.target.value }))} className="form-select-modern">
-                           {EGG_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
-                        </select>
-                     </div>
-                  </div>
-
-                  {activeTab === 'sell' && (
-                     <div className="sale-category-toggle">
-                        <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'retail' }))} className={`toggle-btn ${formData.saleCategory === 'retail' ? 'active' : ''}`}>খুচরা</button>
-                        <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'wholesale' }))} className={`toggle-btn ${formData.saleCategory === 'wholesale' ? 'active' : ''}`}>পাইকারি</button>
-                     </div>
-                  )}
-
-                  {activeTab !== 'expense' && (
-                    <>
-                      <div className="grid grid-cols-2 gap-4">
-                         <ModernInput label="পরিমাণ" type="number" value={formData.quantity} onChange={e => setFormData(p => ({ ...p, quantity: e.target.value }))} placeholder="0" required icon={PlusCircle} />
-                         <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">একক</label>
-                            <select value={formData.unit} onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} disabled={activeTab === 'buy' || formData.saleCategory === 'wholesale'} className="form-select-modern disabled:opacity-50">
-                               {Object.entries(SELL_UNITS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                            </select>
-                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                         <ModernInput label="দর (একক)" type="number" value={formData.rate} onChange={e => setFormData(p => ({ ...p, rate: e.target.value }))} readOnly={activeTab === 'sell' && userRole === 'subadmin'} placeholder="0.00" required icon={TrendingUp} />
-                         <ModernInput label={activeTab === 'sell' ? "কাস্টমার" : "মহাজন"} value={formData.customerName} onChange={e => setFormData(p => ({ ...p, customerName: e.target.value }))} placeholder="নাম..." required={activeTab === 'buy' || formData.saleCategory === 'wholesale'} icon={User} />
-                      </div>
-
-                      <div className="total-bill-display-box">
-                         <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] mb-1">সর্বমোট বিল</p>
-                         <h3 className="text-3xl font-black text-white">৳{(parseFloat(formData.quantity || 0) * parseFloat(formData.rate || 0) - parseFloat(formData.discount || 0)).toLocaleString()}</h3>
-                         <div className="w-full mt-6 bg-white/10 p-4 rounded-2xl border border-white/10">
-                            <ModernInput label="নগদ জমা" type="number" value={formData.paidAmount} onChange={e => setFormData(p => ({ ...p, paidAmount: e.target.value }))} placeholder="সব পরিশোধ" className="bg-transparent text-white" />
-                         </div>
-                      </div>
-                    </>
-                  )}
-
-                  {activeTab === 'expense' && (
-                    <div className="space-y-4">
-                       <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">খরচের খাত</label>
-                          <select value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className="form-select-modern">
-                             {EXPENSE_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
-                             <option value="অন্যান্য">অন্যান্য</option>
-                          </select>
-                       </div>
-                       <ModernInput label="টাকার পরিমাণ" type="number" value={formData.amount} onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))} placeholder="0.00" required icon={Wallet} />
-                    </div>
-                  )}
-
-                  <button disabled={submitting} className={`submit-action-btn ${activeTab}`}>
-                    {submitting ? 'প্রসেসিং হচ্ছে...' : 'ডাটা সেভ করুন'}
-                  </button>
-               </form>
-            </Section>
-          </div>
-        )}
-
-        {/* REGISTER VIEW */}
-        {activeTab === 'history' && (
-          <div className="animate-in fade-in duration-500 space-y-4">
-             <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-                {['all', 'sell', 'buy', 'expense'].map(t => (
-                  <button key={t} onClick={() => setTypeFilter(t)} className={`history-filter-btn ${typeFilter === t ? 'active' : ''}`}>{t === 'all' ? 'সব' : t === 'sell' ? 'বিক্রি' : t === 'buy' ? 'কেনা' : 'খরচ'}</button>
-                ))}
-             </div>
-
-             <div className="register-data-table">
-                <div className="table-header-box px-6 py-5 flex justify-between items-center">
-                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">লেনদেন রেজিস্টার</h3>
-                   <button onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')} className={`filter-icon-btn ${dateFilter === 'today' ? 'active' : ''}`}><Filter size={16}/></button>
+              <WebCard title="সাম্প্রতিক লেনদেন" icon={History} action={<button onClick={() => setActiveTab('history')} className="text-[10px] font-black text-orange-600 hover:underline uppercase">সব দেখুন</button>}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="border-b border-gray-50">
+                      <tr>
+                        <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">বিবরণ</th>
+                        <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">ধরণ</th>
+                        <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">পরিমাণ</th>
+                        <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">টাকা</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {transactions.slice(0, 6).map(t => (
+                        <tr key={t.id} className="hover:bg-gray-50 transition-all">
+                          <td className="py-4">
+                            <p className="font-bold text-sm text-gray-800">{t.customerName || t.description || t.eggType}</p>
+                            <p className="text-[10px] text-gray-400">{t.date}</p>
+                          </td>
+                          <td className="py-4">
+                            <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg ${
+                              t.type === 'sell' ? 'bg-emerald-50 text-emerald-600' : t.type === 'buy' ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'
+                            }`}>
+                              {t.type === 'sell' ? 'বিক্রি' : t.type === 'buy' ? 'ক্রয়' : 'খরচ'}
+                            </span>
+                          </td>
+                          <td className="py-4">
+                            <p className="text-sm font-bold text-gray-700">{t.quantity > 0 ? `${t.quantity} ${SELL_UNITS[t.unit]?.label || 'পিস'}` : '-'}</p>
+                          </td>
+                          <td className="py-4 text-right">
+                            <p className={`font-black ${t.type === 'sell' ? 'text-emerald-600' : 'text-gray-900'}`}>
+                              {t.type === 'sell' ? '+' : '-'} ৳{t.amount.toLocaleString()}
+                            </p>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="divide-y divide-gray-50">
-                   {filteredHistory.map(t => (
-                     <div key={t.id} className="table-row-item hover:bg-gray-50/50 transition-colors">
-                        <div className="flex items-center gap-4">
-                           <div className={`row-indicator-bar ${t.type}`}></div>
-                           <div>
-                              <h4 className="font-black text-gray-800 text-sm leading-none mb-1">{t.customerName || t.description || t.eggType}</h4>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase">{t.date} • {t.quantity > 0 ? `${t.quantity} ${t.unit}` : 'খরচ'}</p>
-                           </div>
-                        </div>
-                        <div className="text-right">
-                           <p className="font-black text-gray-900 text-sm">৳{t.amount.toLocaleString()}</p>
-                           {t.dueAmount > 0 && <span className="due-tag">বাকি ৳{t.dueAmount}</span>}
-                        </div>
-                     </div>
-                   ))}
-                   {filteredHistory.length === 0 && <div className="p-20 text-center text-gray-300 font-black uppercase text-xs tracking-widest">কোনো তথ্য নেই</div>}
-                </div>
-             </div>
-          </div>
-        )}
+              </WebCard>
+            </div>
+          )}
 
-        {/* SETTINGS VIEW */}
-        {activeTab === 'settings' && userRole === 'admin' && (
-          <div className="animate-in slide-in-from-right-4 duration-300 space-y-6">
-             <Section title="ডিমের রেট সেটিংস" icon={Settings}>
-                <div className="space-y-6">
-                   {EGG_TYPES.map(egg => (
-                     <div key={egg} className="settings-rate-card p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
-                        <h4 className="text-xs font-black text-gray-700 mb-4 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div> {egg}</h4>
-                        <div className="grid grid-cols-3 gap-3 mb-4">
-                           {['pis', 'hali', 'case'].map(u => (
-                             <div key={u}>
-                                <label className="text-[8px] font-black text-gray-400 uppercase ml-1.5 mb-1 block">{u === 'pis' ? 'পিস' : u === 'hali' ? 'হালি' : 'কেস'}</label>
-                                <input type="number" value={rates.retail[egg]?.[u] || ''} onChange={e => setRates(p => ({ ...p, retail: { ...p.retail, [egg]: { ...p.retail[egg], [u]: e.target.value } } }))} className="settings-rate-input" placeholder="0" />
+          {/* --- FORMS (Sell/Buy/Expense) --- */}
+          {(activeTab === 'sell' || activeTab === 'buy' || activeTab === 'expense') && (
+            <div className="max-w-4xl mx-auto animate-in slide-in-from-bottom-8 duration-500">
+              <WebCard title={`${activeTab === 'sell' ? 'বিক্রি' : activeTab === 'buy' ? 'ক্রয়' : 'খরচ'} ভাউচার`} icon={Target}>
+                <form onSubmit={handleSubmit} className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-6">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">তারিখ</label>
+                        <input type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} className="web-input" required />
+                      </div>
+                      
+                      {activeTab !== 'expense' && (
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">ডিমের ধরণ</label>
+                              <select value={formData.eggType} onChange={e => setFormData(p => ({ ...p, eggType: e.target.value }))} className="web-input">
+                                {EGG_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
+                              </select>
+                            </div>
+                            {activeTab === 'sell' && (
+                              <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">বিক্রি ক্যাটাগরি</label>
+                                <div className="flex bg-gray-100 p-1 rounded-xl">
+                                  <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'retail' }))} className={`flex-1 py-1 rounded-lg text-[10px] font-black ${formData.saleCategory === 'retail' ? 'bg-white shadow text-orange-600' : 'text-gray-400'}`}>খুচরা</button>
+                                  <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'wholesale' }))} className={`flex-1 py-1 rounded-lg text-[10px] font-black ${formData.saleCategory === 'wholesale' ? 'bg-white shadow text-orange-600' : 'text-gray-400'}`}>পাইকারি</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">পরিমাণ</label>
+                                <input type="number" value={formData.quantity} onChange={e => setFormData(p => ({ ...p, quantity: e.target.value }))} className="web-input" placeholder="0" required />
                              </div>
-                           ))}
+                             <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">একক</label>
+                                <select value={formData.unit} onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} disabled={activeTab === 'buy' || formData.saleCategory === 'wholesale'} className="web-input disabled:opacity-50">
+                                   {Object.entries(SELL_UNITS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                                </select>
+                             </div>
+                          </div>
+                        </>
+                      )}
+
+                      {activeTab === 'expense' && (
+                        <div>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">খরচের খাত</label>
+                          <select value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className="web-input">
+                            {EXPENSE_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
+                            <option value="অন্যান্য">অন্যান্য</option>
+                          </select>
                         </div>
-                        <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-                           <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">পাইকারি দর</span>
-                           <input type="number" value={rates.wholesale[egg] || ''} onChange={e => setRates(p => ({ ...p, wholesale: { ...p.wholesale, [egg]: e.target.value } }))} className="wholesale-input-field" placeholder="0" />
+                      )}
+                    </div>
+
+                    <div className="space-y-6">
+                      {activeTab !== 'expense' && (
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">দর (প্রতি একক)</label>
+                                <input type="number" value={formData.rate} onChange={e => setFormData(p => ({ ...p, rate: e.target.value }))} className="web-input" placeholder="0.00" required readOnly={activeTab === 'sell' && userRole === 'subadmin'} />
+                             </div>
+                             <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">ডিসকাউন্ট</label>
+                                <input type="number" value={formData.discount} onChange={e => setFormData(p => ({ ...p, discount: e.target.value }))} className="web-input" placeholder="0" />
+                             </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">{activeTab === 'sell' ? 'কাস্টমার নাম' : 'মহাজন নাম'}</label>
+                            <input type="text" value={formData.customerName} onChange={e => setFormData(p => ({ ...p, customerName: e.target.value }))} className="web-input" placeholder="নাম লিখুন..." required={activeTab === 'buy' || formData.saleCategory === 'wholesale'} />
+                          </div>
+                        </>
+                      )}
+
+                      {activeTab === 'expense' && (
+                        <div>
+                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">টাকার পরিমাণ</label>
+                           <input type="number" value={formData.amount} onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))} className="web-input" placeholder="0.00" required />
+                        </div>
+                      )}
+
+                      <div className="p-8 bg-gray-900 rounded-[2rem] text-center">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">পেমেন্ট ক্যালকুলেশন</p>
+                        <h3 className="text-4xl font-black text-white mb-6">
+                          ৳{(parseFloat(formData.quantity || 0) * parseFloat(formData.rate || 0) - parseFloat(formData.discount || 0) + (activeTab === 'expense' ? parseFloat(formData.amount || 0) : 0)).toLocaleString()}
+                        </h3>
+                        {activeTab !== 'expense' && (
+                          <div className="max-w-[200px] mx-auto">
+                            <label className="text-[9px] font-black text-gray-400 uppercase mb-2 block">নগদ জমা</label>
+                            <input type="number" value={formData.paidAmount} onChange={e => setFormData(p => ({ ...p, paidAmount: e.target.value }))} className="w-full bg-white/10 border border-white/20 rounded-xl py-2 px-4 text-white text-center font-black outline-none focus:border-orange-500" placeholder="সম্পূর্ণ" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button disabled={submitting} className={`w-full py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all text-white ${
+                    activeTab === 'sell' ? 'bg-emerald-600 shadow-emerald-100' : activeTab === 'buy' ? 'bg-blue-600 shadow-blue-100' : 'bg-rose-600 shadow-rose-100'
+                  }`}>
+                    {submitting ? 'PROCESSING...' : 'ভাউচার সেভ করুন'}
+                  </button>
+                </form>
+              </WebCard>
+            </div>
+          )}
+
+          {/* --- HISTORY TABLE --- */}
+          {activeTab === 'history' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                  <div className="flex gap-2">
+                    {['all', 'sell', 'buy', 'expense'].map(t => (
+                      <button key={t} onClick={() => setTypeFilter(t)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${typeFilter === t ? 'bg-gray-900 text-white border-gray-900 shadow-xl' : 'bg-white text-gray-400 border-gray-100 hover:border-orange-200'}`}>
+                        {t === 'all' ? 'সব' : t === 'sell' ? 'বিক্রি' : t === 'buy' ? 'ক্রয়' : 'খরচ'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3">
+                     <button onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border font-black text-[10px] uppercase transition-all ${dateFilter === 'today' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-white text-gray-400 border-gray-100'}`}>
+                        <Filter size={16} /> {dateFilter === 'today' ? 'আজকের' : 'সকল সময়ের'}
+                     </button>
+                  </div>
+               </div>
+
+               <WebCard title="সম্পূর্ণ লেনদেন রেজিস্টার" icon={History}>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left min-w-[800px]">
+                      <thead className="bg-gray-50/50">
+                        <tr>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">তারিখ</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">বিবরণ</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">পরিমাণ</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">মোট টাকা</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">বাকি</th>
+                          {userRole === 'admin' && <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">অ্যাকশন</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {filteredHistory.map(t => (
+                          <tr key={t.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-6 py-5 text-sm font-bold text-gray-500">{t.date}</td>
+                            <td className="px-6 py-5">
+                               <div className="flex items-center gap-3">
+                                  <div className={`w-2 h-2 rounded-full ${t.type === 'sell' ? 'bg-emerald-500' : t.type === 'buy' ? 'bg-blue-500' : 'bg-rose-500'}`}></div>
+                                  <p className="font-black text-gray-800 text-sm">{t.customerName || t.description || t.eggType}</p>
+                               </div>
+                            </td>
+                            <td className="px-6 py-5 text-center font-bold text-sm text-gray-600">{t.quantity > 0 ? `${t.quantity} ${t.unit}` : '-'}</td>
+                            <td className="px-6 py-5 text-right font-black text-gray-900">৳{t.amount.toLocaleString()}</td>
+                            <td className="px-6 py-5 text-right">
+                               {t.dueAmount > 0 ? <span className="bg-rose-50 text-rose-600 px-3 py-1 rounded-full text-[10px] font-black">৳{t.dueAmount}</span> : <span className="text-emerald-500 text-[10px] font-black">Paid</span>}
+                            </td>
+                            {userRole === 'admin' && (
+                              <td className="px-6 py-5 text-center">
+                                <button onClick={() => { if(window.confirm('মুছে ফেলতে চান?')) deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'egg_transactions_v2', t.id)); }} className="p-2 text-gray-300 hover:text-rose-500 transition-colors">
+                                  <Trash2 size={16} />
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+               </WebCard>
+            </div>
+          )}
+
+          {/* --- SETTINGS VIEW --- */}
+          {activeTab === 'settings' && userRole === 'admin' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-right-8 duration-500">
+               <WebCard title="ডিমের রেট কনফিগারেশন" icon={Settings}>
+                  <div className="space-y-6">
+                     {EGG_TYPES.map(egg => (
+                       <div key={egg} className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                          <h4 className="font-black text-sm text-gray-700 mb-6 flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div> {egg}</h4>
+                          <div className="grid grid-cols-3 gap-4">
+                             {['pis', 'hali', 'case'].map(u => (
+                               <div key={u}>
+                                  <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block text-center">{u}</label>
+                                  <input 
+                                    type="number" 
+                                    value={rates.retail[egg]?.[u] || ''} 
+                                    onChange={e => setRates(p => ({ ...p, retail: { ...p.retail, [egg]: { ...p.retail[egg], [u]: e.target.value } } }))} 
+                                    className="w-full p-3 rounded-xl border border-gray-200 text-center font-black text-sm focus:border-orange-500 outline-none transition-all" 
+                                  />
+                               </div>
+                             ))}
+                          </div>
+                          <div className="mt-6 pt-6 border-t border-gray-200 flex justify-between items-center">
+                             <span className="text-[10px] font-black uppercase text-purple-600">Wholesale Rate (পিস)</span>
+                             <input 
+                               type="number" 
+                               value={rates.wholesale[egg] || ''} 
+                               onChange={e => setRates(p => ({ ...p, wholesale: { ...p.wholesale, [egg]: e.target.value } }))} 
+                               className="w-24 p-2 bg-purple-50 border border-purple-100 rounded-xl text-center font-black text-sm outline-none" 
+                             />
+                          </div>
+                       </div>
+                     ))}
+                     <button onClick={async () => { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'rates'), rates); alert('Updated!'); }} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">কনফিগারেশন সেভ করুন</button>
+                  </div>
+               </WebCard>
+
+               <div className="space-y-8">
+                  <WebCard title="সিস্টেম সিকিউরিটি" icon={ShieldCheck}>
+                     <p className="text-xs text-gray-400 mb-6 font-bold uppercase tracking-widest leading-loose">পাসওয়ার্ড পরিবর্তন করার সময় সতর্কতা অবলম্বন করুন।</p>
+                     <div className="space-y-4">
+                        <div className="p-4 bg-gray-50 rounded-2xl flex items-center justify-between">
+                           <span className="text-xs font-bold text-gray-600 uppercase">অ্যাডমিন পাসওয়ার্ড</span>
+                           <button className="text-[10px] font-black text-orange-600 uppercase bg-white px-3 py-1 rounded-lg border border-orange-100">পরিবর্তন</button>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-2xl flex items-center justify-between">
+                           <span className="text-xs font-bold text-gray-600 uppercase">সাব-অ্যাডমিন পাসওয়ার্ড</span>
+                           <button className="text-[10px] font-black text-orange-600 uppercase bg-white px-3 py-1 rounded-lg border border-orange-100">পরিবর্তন</button>
                         </div>
                      </div>
-                   ))}
-                   <button onClick={async () => { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'rates'), rates); alert('রেট সফলভাবে আপডেট হয়েছে!'); }} className="w-full py-4 bg-gray-900 text-white rounded-3xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all">সবগুলো সেভ করুন</button>
-                </div>
-             </Section>
-          </div>
-        )}
-
-      </main>
-
-      {/* Floating Bottom Navigation Bar */}
-      <nav className="app-floating-nav">
-        {[
-          { id: 'dashboard', icon: LayoutDashboard },
-          { id: 'buy', icon: ArrowDownCircle },
-          { id: 'sell', icon: ArrowUpCircle },
-          { id: 'expense', icon: Wallet },
-          { id: 'history', icon: History },
-          { id: 'settings', icon: Settings, admin: true }
-        ].map(item => {
-          if (item.admin && userRole !== 'admin') return null;
-          const isActive = activeTab === item.id;
-          return (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`nav-icon-item ${isActive ? 'active' : ''}`}>
-               <item.icon size={22} />
-               {isActive && <div className="nav-indicator-dot"></div>}
-            </button>
-          )
-        })}
-      </nav>
+                  </WebCard>
+               </div>
+            </div>
+          )}
+        </main>
+      </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;700&display=swap');
         
-        /* AGGRESSIVE CSS RESET - DO NOT REMOVE */
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Hind Siliguri', sans-serif !important; }
+        * { 
+          margin: 0; 
+          padding: 0; 
+          box-sizing: border-box; 
+          font-family: 'Hind Siliguri', sans-serif !important; 
+        }
         
-        html, body, #root { 
-          width: 100% !important; 
-          min-height: 100vh !important; 
-          margin: 0 !important; 
-          padding: 0 !important; 
-          display: block !important; 
-          background: #FDFCFB !important;
-          color: #111;
-          place-items: initial !important; /* Vite Override */
-          text-align: left !important;
-          overflow-x: hidden;
+        body {
+          background: #F8F9FA;
         }
 
-        .app-main-wrapper {
+        .login-overlay-full { position: fixed; inset: 0; z-index: 100; background: white; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+        .login-content-box { width: 100%; max-width: 320px; text-align: center; }
+        .login-icon-circle { background: #fff7ed; color: #ea580c; width: 80px; height: 80px; border-radius: 2rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
+        .login-field-input { width: 100%; padding: 1.25rem; background: #f9fafb; border: 2px solid #f3f4f6; border-radius: 1.5rem; text-align: center; font-size: 2rem; font-weight: 900; letter-spacing: 0.5rem; outline: none; }
+        .login-action-btn { width: 100%; padding: 1.25rem; background: #111827; color: white; border: none; border-radius: 1.5rem; font-weight: 900; margin-top: 1rem; }
+
+        .app-global-header { width: 100%; position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.85); backdrop-filter: blur(24px); border-bottom: 1px solid #f0f0f0; padding: 1.25rem 0; }
+        .header-icon-box { padding: 0.6rem; border-radius: 1.25rem; }
+        
+        .web-input {
           width: 100%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-
-        .app-content-area {
-          width: 100%;
-          max-width: 600px;
-          margin: 0 auto;
-        }
-
-        /* Modern UI Elements */
-        .app-global-header {
-          width: 100%;
-          position: sticky;
-          top: 0;
-          z-index: 50;
-          background: rgba(255,255,255,0.85);
-          backdrop-filter: blur(24px);
-          border-bottom: 1px solid #f0f0f0;
-          padding: 1.25rem 0;
-        }
-
-        .header-container-inner {
-          width: 100%;
-          max-width: 600px;
-          margin: 0 auto;
-        }
-
-        .header-icon-box {
-          padding: 0.6rem;
+          padding: 1rem 1.25rem;
+          background: #F9FAFB;
+          border: 1px solid #E5E7EB;
           border-radius: 1.25rem;
+          font-weight: 700;
+          font-size: 0.875rem;
+          outline: none;
+          transition: all 0.2s;
+        }
+        
+        .web-input:focus {
+          border-color: #EA580C;
+          background: white;
+          box-shadow: 0 0 0 4px rgba(234, 88, 12, 0.05);
         }
 
         .profit-card-highlight {
@@ -646,147 +803,20 @@ export default function App() {
           overflow: hidden;
         }
 
-        .transaction-list-item {
-          background: white;
-          padding: 1rem;
-          border-radius: 1.5rem;
-          border: 1px solid #f5f5f5;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          transition: all 0.2s;
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
+
+        .animate-in {
+          animation: fadeIn 0.4s ease-out;
         }
 
-        .icon-box-small { padding: 0.75rem; border-radius: 1rem; }
-        .icon-box-small.sell { background: #f0fdf4; color: #16a34a; }
-        .icon-box-small.buy { background: #eff6ff; color: #2563eb; }
-        .icon-box-small.expense { background: #fef2f2; color: #dc2626; }
-
-        .logout-btn-full {
-          width: 100%;
-          padding: 1.25rem;
-          margin-top: 1.5rem;
-          border-radius: 1.5rem;
-          border: 2px solid #fff1f2;
-          background: none;
-          color: #f43f5e;
-          font-weight: 900;
-          font-size: 0.75rem;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 0.5rem;
-          transition: background 0.2s;
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-
-        /* Form Styling */
-        .form-select-modern {
-          width: 100%;
-          padding: 0.875rem 1rem;
-          background: #f9fafb;
-          border: 1px solid #e5e7eb;
-          border-radius: 1.25rem;
-          font-weight: 900;
-          font-size: 0.875rem;
-          outline: none;
-        }
-
-        .sale-category-toggle {
-          display: flex;
-          background: #f3f4f6;
-          padding: 0.375rem;
-          border-radius: 1.25rem;
-          border: 1px solid #e5e7eb;
-        }
-        .toggle-btn {
-          flex: 1;
-          padding: 0.75rem;
-          border-radius: 1rem;
-          font-size: 0.75rem;
-          font-weight: 900;
-          text-transform: uppercase;
-          border: none;
-          background: none;
-          color: #9ca3af;
-          transition: all 0.2s;
-        }
-        .toggle-btn.active {
-          background: white;
-          color: #ea580c;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        .total-bill-display-box {
-          background: #ea580c;
-          background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
-          border-radius: 2rem;
-          padding: 1.5rem;
-          text-align: center;
-          box-shadow: 0 10px 15px -3px rgba(234, 88, 12, 0.3);
-        }
-
-        .submit-action-btn {
-          width: 100%;
-          padding: 1.25rem;
-          border-radius: 1.5rem;
-          border: none;
-          color: white;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }
-        .submit-action-btn.sell { background: #16a34a; }
-        .submit-action-btn.buy { background: #2563eb; }
-        .submit-action-btn.expense { background: #dc2626; }
-
-        /* Login Overlay Styling */
-        .login-overlay-full { position: fixed; inset: 0; z-index: 100; background: white; display: flex; align-items: center; justify-content: center; padding: 2rem; }
-        .login-content-box { width: 100%; max-width: 320px; text-align: center; }
-        .login-icon-circle { background: #fff7ed; color: #ea580c; width: 80px; height: 80px; border-radius: 2rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
-        .login-field-input { width: 100%; padding: 1.25rem; background: #f9fafb; border: 2px solid #f3f4f6; border-radius: 1.5rem; text-align: center; font-size: 2rem; font-weight: 900; letter-spacing: 0.5rem; outline: none; }
-        .login-action-btn { width: 100%; padding: 1.25rem; background: #111827; color: white; border: none; border-radius: 1.5rem; font-weight: 900; margin-top: 1rem; }
-
-        /* Floating Nav Bar */
-        .app-floating-nav {
-          position: fixed;
-          bottom: 1.5rem;
-          left: 50%;
-          transform: translateX(-50%);
-          width: calc(100% - 3rem);
-          max-width: 450px;
-          background: rgba(255,255,255,0.9);
-          backdrop-filter: blur(24px);
-          border: 1px solid rgba(0,0,0,0.05);
-          padding: 0.75rem;
-          border-radius: 2.5rem;
-          display: flex;
-          justify-content: space-around;
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-          z-index: 60;
-        }
-        .nav-icon-item { border: none; background: none; color: #9ca3af; padding: 0.75rem; border-radius: 1.5rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
-        .nav-icon-item.active { background: #ea580c; color: white; transform: translateY(-1.25rem) scale(1.1); box-shadow: 0 10px 15px -3px rgba(234, 88, 12, 0.3); }
-        .nav-indicator-dot { position: absolute; bottom: -0.5rem; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background: white; border-radius: 50%; }
-
-        /* Tables & History */
-        .history-filter-btn { padding: 0.625rem 1.25rem; border-radius: 1rem; border: 1px solid #f3f4f6; background: white; color: #9ca3af; font-size: 0.75rem; font-weight: 900; text-transform: uppercase; }
-        .history-filter-btn.active { background: #111827; color: white; border-color: #111827; }
-        .register-data-table { background: white; border-radius: 2rem; border: 1px solid #f0f0f0; overflow: hidden; }
-        .table-row-item { padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f9fafb; }
-        .row-indicator-bar { width: 4px; height: 2.5rem; border-radius: 2px; }
-        .row-indicator-bar.sell { background: #10b981; }
-        .row-indicator-bar.buy { background: #3b82f6; }
-        .row-indicator-bar.expense { background: #ef4444; }
-        .due-tag { background: #fff1f2; color: #f43f5e; font-size: 0.625rem; font-weight: 900; padding: 0.125rem 0.5rem; border-radius: 1rem; margin-top: 0.25rem; display: inline-block; }
-
-        /* Settings */
-        .settings-rate-input { width: 100%; padding: 0.75rem; border-radius: 1rem; border: 1px solid #e5e7eb; text-align: center; font-weight: 900; font-size: 0.875rem; outline: none; }
-        .wholesale-input-field { width: 6rem; padding: 0.5rem; border-radius: 0.75rem; border: 1px solid #ddd; font-weight: 900; text-align: center; }
-
-        .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
     </div>
   );

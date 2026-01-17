@@ -38,7 +38,9 @@ import {
   Settings,
   Phone,
   Filter,
-  ChevronRight
+  ChevronRight,
+  TrendingUp,
+  AlertCircle
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
@@ -105,12 +107,16 @@ const CustomSelect = ({ label, value, onChange, options, disabled = false, icon:
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
+      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+        <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+      </div>
     </div>
   </div>
 );
 
 const MetricCard = ({ title, value, subValue, icon: Icon, colorClass, blurred = false }) => (
   <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition-all">
+    <div className={`absolute -right-4 -top-4 w-16 h-16 rounded-full opacity-5 group-hover:opacity-10 transition-opacity ${colorClass.split(' ')[0]}`}></div>
     <div className="flex items-center gap-3 mb-3">
       <div className={`p-2.5 rounded-xl ${colorClass}`}>
         <Icon size={20} />
@@ -330,23 +336,26 @@ export default function App() {
         </div>
       )}
 
+      {/* Modern Header */}
       <header className="main-header">
-        <div className="header-content max-w-2xl mx-auto">
+        <div className="header-content max-w-2xl mx-auto px-4">
           <div className="flex items-center gap-3">
             <div className="header-icon"><Egg size={22} /></div>
             <div>
-              <h1 className="text-lg font-black leading-none">নিশাদ এগ্রো</h1>
-              <p className="text-[9px] font-bold uppercase mt-1 opacity-60 flex items-center gap-1"><Phone size={10} /> 01979665911</p>
+              <h1 className="text-xl font-black leading-none">নিশাদ এগ্রো</h1>
+              <p className="text-[10px] font-bold uppercase mt-1 opacity-60 flex items-center gap-1"><Phone size={10} /> 01979665911</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-bold opacity-40 uppercase">ক্যাশ</p>
-            <p className="font-black text-orange-600">৳{stats.cash.toLocaleString()}</p>
+            <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">ক্যাশ বক্স</p>
+            <p className="text-xl font-black text-orange-600">৳{stats.cash.toLocaleString()}</p>
           </div>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto p-5 pb-32">
+      <main className="max-w-2xl mx-auto p-4 md:p-6 pb-32">
+        
+        {/* Dashboard View */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             <div className="grid grid-cols-3 gap-3">
@@ -361,117 +370,202 @@ export default function App() {
             </div>
 
             <div className="profit-banner">
-              <p className="text-[10px] font-bold uppercase opacity-80 mb-1">আজকের লাভ/লস</p>
-              <div className="flex justify-between items-end">
-                {userRole === 'admin' ? <h2 className="text-3xl font-black">৳{stats.todayProfit.toLocaleString()}</h2> : <div className="blur-sm text-2xl font-black">৳৳৳৳৳</div>}
-                <div className="text-right"><p className="text-[9px] uppercase font-bold opacity-60">আজকের বিক্রি</p><p className="font-bold">৳{stats.todaySales}</p></div>
+              <div className="flex flex-col">
+                <p className="text-[11px] font-bold uppercase opacity-80 mb-1 tracking-widest">আজকের নিট লাভ/লস</p>
+                {userRole === 'admin' ? (
+                  <h2 className="text-4xl font-black">৳{stats.todayProfit.toLocaleString()}</h2>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-3xl font-black blur-md select-none tracking-tighter">৳৳৳৳৳</span>
+                    <Lock size={18} className="opacity-50" />
+                  </div>
+                )}
+              </div>
+              <div className="text-right border-l border-white/20 pl-4">
+                <p className="text-[10px] uppercase font-bold opacity-60 mb-1">আজকের বিক্রি</p>
+                <p className="text-lg font-black tracking-tight">৳{stats.todaySales.toLocaleString()}</p>
               </div>
             </div>
 
-            <div className="recent-list space-y-3">
-              <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">সাম্প্রতিক লেনদেন</h3>
-              {transactions.slice(0, 4).map(t => (
-                <div key={t.id} className="transaction-item">
-                  <div className="flex items-center gap-3">
-                    <div className={`t-icon ${t.type}`}>{t.type === 'sell' ? <ArrowUpCircle size={18}/> : t.type === 'buy' ? <ArrowDownCircle size={18}/> : <MinusCircle size={18}/>}</div>
-                    <div>
-                      <h4 className="font-bold text-sm leading-tight">{t.customerName || t.description || t.eggType}</h4>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">{t.type === 'sell' ? `${t.quantity} ${SELL_UNITS[t.unit]?.label}` : t.date}</p>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center px-1">
+                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">সাম্প্রতিক লেনদেন</h3>
+                <button onClick={() => setActiveTab('history')} className="text-[10px] font-bold text-orange-600 uppercase">সব দেখুন</button>
+              </div>
+              <div className="space-y-3">
+                {transactions.slice(0, 5).map(t => (
+                  <div key={t.id} className="transaction-item group">
+                    <div className="flex items-center gap-4">
+                      <div className={`t-icon ${t.type} rounded-2xl p-3`}>
+                        {t.type === 'sell' ? <ArrowUpCircle size={22}/> : t.type === 'buy' ? <ArrowDownCircle size={22}/> : <MinusCircle size={22}/>}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-gray-900 leading-tight">{t.customerName || t.description || t.eggType}</h4>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">
+                          {t.type === 'sell' ? `${t.quantity} ${SELL_UNITS[t.unit]?.label}` : t.date}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                       <p className={`font-black text-sm ${t.type === 'sell' ? 'text-green-600' : 'text-gray-900'}`}>
+                         {t.type === 'sell' ? '+' : '-'} ৳{t.amount.toLocaleString()}
+                       </p>
+                       {t.dueAmount > 0 && <span className="text-[8px] font-black text-red-500 bg-red-50 px-1.5 rounded-full inline-block mt-1">বাকি ৳{t.dueAmount}</span>}
                     </div>
                   </div>
-                  <p className={`font-black text-sm ${t.type === 'sell' ? 'text-green-600' : 'text-gray-900'}`}>{t.type === 'sell' ? '+' : '-'} ৳{t.amount}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
 
+        {/* Improved Forms */}
         {(activeTab === 'sell' || activeTab === 'buy' || activeTab === 'expense') && (
-          <div className="form-card">
-            <h2 className="text-xl font-black mb-6 uppercase flex items-center gap-2">
-              {activeTab === 'sell' ? <ShoppingCart className="text-green-600"/> : activeTab === 'buy' ? <PlusCircle className="text-blue-600"/> : <Wallet className="text-red-600"/>}
-              {activeTab === 'sell' ? 'বিক্রি' : activeTab === 'buy' ? 'মাল কেনা' : 'খরচ'} এন্ট্রি
-            </h2>
+          <div className="form-card animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="flex items-center gap-4 mb-8">
+              <div className={`p-3 rounded-2xl ${activeTab === 'sell' ? 'bg-green-100 text-green-600' : activeTab === 'buy' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
+                {activeTab === 'sell' ? <ShoppingCart size={24}/> : activeTab === 'buy' ? <PlusCircle size={24}/> : <Wallet size={24}/>}
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-gray-900 uppercase">
+                  {activeTab === 'sell' ? 'বিক্রি' : activeTab === 'buy' ? 'মাল কেনা' : 'খরচ'} এন্ট্রি
+                </h2>
+                <p className="text-xs font-bold text-gray-400">সঠিক তথ্য দিয়ে ডাটা সেভ করুন</p>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-2">
-              <Input label="তারিখ" type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} required />
+              <Input label="তারিখ" type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} required icon={LayoutDashboard} />
+              
               {activeTab !== 'expense' && (
                 <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <CustomSelect label="ডিমের ধরণ" value={formData.eggType} onChange={e => setFormData(p => ({ ...p, eggType: e.target.value }))} options={EGG_TYPES.map(v => ({ label: v, value: v }))} />
-                    <CustomSelect label="একক" value={formData.unit} onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} disabled={activeTab === 'buy' || formData.saleCategory === 'wholesale'} options={Object.entries(SELL_UNITS).map(([k, v]) => ({ label: v.label, value: k }))} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <CustomSelect label="ডিমের ধরণ" value={formData.eggType} onChange={e => setFormData(p => ({ ...p, eggType: e.target.value }))} options={EGG_TYPES.map(v => ({ label: v, value: v }))} icon={Egg} />
+                    <CustomSelect label="একক" value={formData.unit} onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} disabled={activeTab === 'buy' || formData.saleCategory === 'wholesale'} options={Object.entries(SELL_UNITS).map(([k, v]) => ({ label: v.label, value: k }))} icon={Filter} />
                   </div>
+
                   {activeTab === 'sell' && (
-                    <div className="flex bg-gray-100 p-1 rounded-xl mb-4">
-                      <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'retail' }))} className={`flex-1 py-2 rounded-lg text-xs font-bold ${formData.saleCategory === 'retail' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-400'}`}>খুচরা</button>
-                      <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'wholesale' }))} className={`flex-1 py-2 rounded-lg text-xs font-bold ${formData.saleCategory === 'wholesale' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-400'}`}>পাইকারি</button>
+                    <div className="flex bg-gray-100/50 p-1.5 rounded-2xl mb-4 border border-gray-100">
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'retail' }))} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${formData.saleCategory === 'retail' ? 'bg-white shadow-sm text-orange-600 border border-gray-100' : 'text-gray-400'}`}>খুচরা</button>
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'wholesale' }))} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${formData.saleCategory === 'wholesale' ? 'bg-white shadow-sm text-orange-600 border border-gray-100' : 'text-gray-400'}`}>পাইকারি</button>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <Input label="পরিমাণ" type="number" value={formData.quantity} onChange={e => setFormData(p => ({ ...p, quantity: e.target.value }))} required />
-                    <Input label="দর" type="number" value={formData.rate} onChange={e => setFormData(p => ({ ...p, rate: e.target.value }))} readOnly={activeTab === 'sell' && userRole === 'subadmin'} required />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input label="পরিমাণ" type="number" value={formData.quantity} onChange={e => setFormData(p => ({ ...p, quantity: e.target.value }))} placeholder="0" required icon={PlusCircle} />
+                    <Input label="দর (প্রতি একক)" type="number" value={formData.rate} onChange={e => setFormData(p => ({ ...p, rate: e.target.value }))} readOnly={activeTab === 'sell' && userRole === 'subadmin'} placeholder="0.00" required icon={ShieldCheck} />
                   </div>
-                  <Input label={activeTab === 'sell' ? "কাস্টমার" : "মহাজন"} value={formData.customerName} onChange={e => setFormData(p => ({ ...p, customerName: e.target.value }))} required={activeTab === 'buy' || formData.saleCategory === 'wholesale'} />
-                  <div className="grid grid-cols-2 gap-3 border-t pt-4">
-                    <div className="bg-gray-50 p-2 rounded-xl text-center"><p className="text-[9px] font-bold text-gray-400 uppercase">মোট</p><p className="font-black text-gray-800">৳{(parseFloat(formData.quantity || 0) * parseFloat(formData.rate || 0) - parseFloat(formData.discount || 0)).toLocaleString()}</p></div>
-                    <Input label="নগদ জমা" type="number" value={formData.paidAmount} onChange={e => setFormData(p => ({ ...p, paidAmount: e.target.value }))} placeholder="সব" />
+
+                  <Input label={activeTab === 'sell' ? "কাস্টমার নাম" : "মহাজন/পাইকারের নাম"} value={formData.customerName} onChange={e => setFormData(p => ({ ...p, customerName: e.target.value }))} placeholder="নাম লিখুন..." required={activeTab === 'buy' || formData.saleCategory === 'wholesale'} icon={User} />
+                  
+                  <div className="grid grid-cols-2 gap-4 border-t border-dashed border-gray-200 pt-6 mt-4">
+                    <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 flex flex-col justify-center items-center">
+                      <p className="text-[10px] font-black text-gray-400 uppercase mb-1">সর্বমোট বিল</p>
+                      <p className="text-2xl font-black text-gray-800">৳{(parseFloat(formData.quantity || 0) * parseFloat(formData.rate || 0) - parseFloat(formData.discount || 0)).toLocaleString()}</p>
+                    </div>
+                    <Input label="নগদ জমা" type="number" value={formData.paidAmount} onChange={e => setFormData(p => ({ ...p, paidAmount: e.target.value }))} placeholder="সব পরিশোধ" icon={Wallet} className="mb-0" />
                   </div>
                 </>
               )}
+
               {activeTab === 'expense' && (
-                <>
-                  <CustomSelect label="খাত" value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} options={EXPENSE_TYPES.map(v => ({ label: v, value: v }))} />
-                  <Input label="টাকা" type="number" value={formData.amount} onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))} required />
-                </>
+                <div className="space-y-4">
+                  <CustomSelect label="খরচের খাত" value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} options={EXPENSE_TYPES.map(v => ({ label: v, value: v }))} icon={Filter} />
+                  <Input label="টাকার পরিমাণ" type="number" value={formData.amount} onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))} placeholder="0.00" required icon={Wallet} />
+                </div>
               )}
-              <button disabled={submitting} className={`submit-btn ${activeTab}`}>{submitting ? 'প্রসেসিং...' : 'সেভ করুন'}</button>
+
+              <button disabled={submitting} className={`submit-btn ${activeTab} py-5 rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all`}>
+                {submitting ? 'প্রসেসিং হচ্ছে...' : 'সেভ করুন'}
+              </button>
             </form>
           </div>
         )}
 
+        {/* Improved Register */}
         {activeTab === 'history' && (
-          <div className="space-y-4">
-            <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+          <div className="space-y-4 animate-in fade-in duration-500">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
               {['all', 'sell', 'buy', 'expense'].map(t => (
-                <button key={t} onClick={() => setTypeFilter(t)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase border transition-all ${typeFilter === t ? 'bg-orange-600 text-white' : 'bg-white text-gray-400'}`}>{t === 'all' ? 'সব' : t}</button>
+                <button key={t} onClick={() => setTypeFilter(t)} className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border transition-all ${typeFilter === t ? 'bg-orange-600 text-white border-orange-600 shadow-lg' : 'bg-white text-gray-400 border-gray-100 hover:border-orange-200'}`}>
+                  {t === 'all' ? 'সব' : t === 'sell' ? 'বিক্রি' : t === 'buy' ? 'কেনা' : 'খরচ'}
+                </button>
               ))}
             </div>
-            <div className="bg-white rounded-[2rem] border overflow-hidden">
-              <div className="p-4 border-b bg-gray-50/50 flex justify-between items-center"><h3 className="text-[10px] font-black uppercase opacity-40">রেজিস্টার</h3><button onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')} className="p-2 bg-white border rounded-lg"><Filter size={14}/></button></div>
-              <div className="divide-y">
-                {filteredHistory.map(t => (
-                  <div key={t.id} className="p-4 flex justify-between items-center">
-                    <div><h4 className="font-bold text-sm">{t.customerName || t.description || t.eggType}</h4><p className="text-[9px] font-bold text-gray-400">{t.date} • {t.quantity > 0 ? `${t.quantity} ${t.unit}` : 'খরচ'}</p></div>
-                    <div className="text-right"><p className="font-black text-sm">৳{t.amount}</p>{t.dueAmount > 0 && <span className="text-[8px] font-black text-red-500 bg-red-50 px-1.5 rounded-full">বাকি ৳{t.dueAmount}</span>}</div>
+
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <History size={16} className="text-gray-400" />
+                  <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-400">লেনদেন রেজিস্টার</h3>
+                </div>
+                <button onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')} className={`p-2.5 rounded-xl border transition-all ${dateFilter === 'today' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-white text-gray-400 border-gray-100'}`}>
+                  <Filter size={16}/>
+                </button>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {filteredHistory.length > 0 ? filteredHistory.map(t => (
+                  <div key={t.id} className="p-5 hover:bg-gray-50/50 transition-colors flex justify-between items-center group">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-1.5 h-10 rounded-full ${t.type === 'sell' ? 'bg-green-500' : t.type === 'buy' ? 'bg-blue-500' : 'bg-red-500'}`}></div>
+                      <div>
+                        <h4 className="font-bold text-sm text-gray-900">{t.customerName || t.description || t.eggType}</h4>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">{t.date} • {t.quantity > 0 ? `${t.quantity} ${t.unit}` : 'খরচ'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black text-gray-900">৳{t.amount.toLocaleString()}</p>
+                      {t.dueAmount > 0 && <span className="text-[9px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-full inline-block mt-1">বাকি ৳{t.dueAmount}</span>}
+                    </div>
                   </div>
-                ))}
+                )) : <div className="p-20 text-center text-gray-300 font-bold uppercase tracking-[0.2em] text-xs">কোনো তথ্য নেই</div>}
               </div>
             </div>
           </div>
         )}
 
+        {/* Improved Settings */}
         {activeTab === 'settings' && userRole === 'admin' && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
             <div className="form-card">
-              <h2 className="text-lg font-black mb-4 uppercase">রেট সেটআপ</h2>
-              <div className="space-y-4">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-gray-100 text-gray-600 rounded-2xl"><Settings size={24}/></div>
+                <h2 className="text-2xl font-black uppercase text-gray-800">রেট সেটিংস</h2>
+              </div>
+              <div className="space-y-5">
                 {EGG_TYPES.map(egg => (
-                  <div key={egg} className="p-4 bg-gray-50 rounded-2xl">
-                    <h3 className="font-black text-xs mb-3">{egg}</h3>
-                    <div className="grid grid-cols-3 gap-2">
+                  <div key={egg} className="p-5 bg-gray-50/50 rounded-[2rem] border border-gray-100">
+                    <h3 className="font-black text-sm text-gray-800 mb-4 flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 bg-orange-500 rounded-full"></div> {egg}
+                    </h3>
+                    <div className="grid grid-cols-3 gap-3">
                       {['pis', 'hali', 'case'].map(u => (
-                        <div key={u}><label className="text-[8px] font-black uppercase opacity-40 ml-1">{u}</label><input type="number" value={rates.retail[egg]?.[u] || ''} onChange={e => setRates(p => ({ ...p, retail: { ...p.retail, [egg]: { ...p.retail[egg], [u]: e.target.value } } }))} className="w-full p-2 rounded-lg border font-black text-center text-sm" /></div>
+                        <div key={u}>
+                          <label className="text-[9px] font-black uppercase opacity-40 ml-1.5 mb-1 block">{u === 'pis' ? 'পিস' : u === 'hali' ? 'হালি' : 'কেস'}</label>
+                          <input 
+                            type="number" 
+                            value={rates.retail[egg]?.[u] || ''} 
+                            onChange={e => setRates(p => ({ ...p, retail: { ...p.retail, [egg]: { ...p.retail[egg], [u]: e.target.value } } }))} 
+                            className="w-full p-3 rounded-xl border border-gray-200 font-black text-center text-sm focus:border-orange-500 outline-none transition-all" 
+                            placeholder="0"
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
                 ))}
-                <button onClick={async () => { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'rates'), rates); alert('সেভ হয়েছে!'); }} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black mt-4">সেভ করুন</button>
+                <button onClick={async () => { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'rates'), rates); alert('রেট সফলভাবে সেভ হয়েছে!'); }} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black mt-4 shadow-xl active:scale-95 transition-all">সবগুলো সেভ করুন</button>
               </div>
             </div>
-            <button onClick={() => { setUserRole('guest'); setActiveTab('dashboard'); }} className="w-full py-4 text-red-600 font-black border-2 border-red-50 rounded-2xl flex items-center justify-center gap-2"><LogOut size={18}/> লগআউট</button>
+            
+            <button onClick={() => { setUserRole('guest'); setActiveTab('dashboard'); }} className="w-full py-5 text-red-600 font-black border-2 border-red-50 bg-red-50/20 rounded-2xl flex items-center justify-center gap-3 hover:bg-red-50 transition-colors">
+              <LogOut size={20}/> সিস্টেম থেকে লগআউট
+            </button>
           </div>
         )}
       </main>
 
+      {/* Floating Centered Bottom Navigation */}
       <nav className="bottom-nav">
         {[
           { id: 'dashboard', icon: LayoutDashboard },
@@ -482,69 +576,106 @@ export default function App() {
           { id: 'settings', icon: Settings, admin: true }
         ].map(item => {
           if (item.admin && userRole !== 'admin') return null;
-          return <button key={item.id} onClick={() => setActiveTab(item.id)} className={`nav-item ${activeTab === item.id ? 'active' : ''}`}><item.icon size={22} /></button>
+          return (
+            <button 
+              key={item.id} 
+              onClick={() => setActiveTab(item.id)} 
+              className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+            >
+              <item.icon size={22} />
+              {activeTab === item.id && <span className="absolute -bottom-1.5 w-1 h-1 bg-orange-600 rounded-full"></span>}
+            </button>
+          )
         })}
       </nav>
 
       <style>{`
-        /* Aggressive CSS Reset */
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif !important; }
+        /* Essential Overrides to fix layout breakage */
+        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Hind Siliguri', sans-serif !important; }
         
         html, body, #root { 
           width: 100% !important; 
           height: 100% !important; 
-          min-height: 100vh !important;
           margin: 0 !important; 
           padding: 0 !important; 
           display: block !important; 
           text-align: left !important;
           background: #FDFCFB !important;
-          overflow-x: hidden;
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
         }
 
-        /* Prevent broken character issues */
-        body { line-height: 1.6; }
-
-        .app-container { width: 100%; min-height: 100vh; position: relative; }
-        
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        .main-header { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); border-b: 1px solid #f0f0f0; padding: 1rem; width: 100%; }
-        .header-content { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-        .header-icon { background: #ea580c; color: white; padding: 0.5rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; }
+        /* Header Style */
+        .main-header { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.85); backdrop-filter: blur(16px); border-b: 1px solid #f0f0f0; padding: 1.25rem 0; width: 100%; }
+        .header-content { display: flex; justify-content: space-between; align-items: center; }
+        .header-icon { background: #ea580c; color: white; padding: 0.6rem; border-radius: 1rem; shadow: 0 10px 15px -3px rgba(234, 88, 12, 0.3); }
 
-        .profit-banner { background: #ea580c; color: white; padding: 1.5rem; border-radius: 1.5rem; box-shadow: 0 10px 20px rgba(234, 88, 12, 0.2); }
+        /* Profit Banner Style */
+        .profit-banner { 
+          background: #ea580c; 
+          background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+          color: white; 
+          padding: 1.75rem; 
+          border-radius: 2rem; 
+          box-shadow: 0 20px 25px -5px rgba(234, 88, 12, 0.2);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          position: relative;
+          overflow: hidden;
+        }
+        .profit-banner::before { content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); pointer-events: none; }
 
-        .transaction-item { background: white; padding: 1rem; border-radius: 1rem; border: 1px solid #f5f5f5; display: flex; justify-content: space-between; align-items: center; }
-        .t-icon { padding: 0.5rem; border-radius: 0.75rem; }
+        /* List Items */
+        .transaction-item { background: white; padding: 1rem; border-radius: 1.5rem; border: 1px solid #f5f5f5; display: flex; justify-content: space-between; align-items: center; transition: transform 0.2s; }
+        .transaction-item:active { transform: scale(0.98); }
         .t-icon.sell { background: #f0fdf4; color: #16a34a; }
         .t-icon.buy { background: #eff6ff; color: #2563eb; }
         .t-icon.expense { background: #fef2f2; color: #dc2626; }
 
+        /* Login Overlay */
         .login-overlay { position: fixed; inset: 0; z-index: 100; background: white; display: flex; align-items: center; justify-content: center; padding: 2rem; }
         .login-card { text-align: center; width: 100%; max-width: 320px; }
-        .login-card h1 { font-size: 2rem; font-weight: 900; margin-bottom: 0.5rem; }
-        .login-card input { width: 100%; padding: 1rem; background: #f9f9f9; border: 2px solid #f0f0f0; border-radius: 1rem; margin-top: 2rem; text-align: center; font-size: 1.5rem; font-weight: 900; letter-spacing: 0.5rem; outline: none; }
-        .login-card button { width: 100%; padding: 1rem; background: #ea580c; color: white; font-weight: 900; border: none; border-radius: 1rem; margin-top: 1rem; cursor: pointer; }
+        .login-card .icon-box { background: #fff7ed; color: #ea580c; width: 80px; height: 80px; border-radius: 2rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; shadow: 0 10px 15px -3px rgba(234, 88, 12, 0.1); }
+        .login-card h1 { font-size: 2.25rem; font-weight: 900; color: #111827; }
+        .login-card p { font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-top: 0.25rem; }
+        .login-card input { width: 100%; padding: 1.25rem; background: #f9fafb; border: 2px solid #f3f4f6; border-radius: 1.5rem; margin-top: 2.5rem; text-align: center; font-size: 1.5rem; font-weight: 900; letter-spacing: 0.5rem; outline: none; transition: border-color 0.2s; }
+        .login-card input:focus { border-color: #ea580c; background: white; }
+        .login-card button { width: 100%; padding: 1.25rem; background: #ea580c; color: white; font-weight: 900; border: none; border-radius: 1.5rem; margin-top: 1rem; cursor: pointer; shadow: 0 10px 15px -3px rgba(234, 88, 12, 0.2); }
 
-        .bottom-nav { position: fixed; bottom: 1.5rem; left: 1.25rem; right: 1.25rem; background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); border: 1px solid rgba(0,0,0,0.05); padding: 0.75rem; border-radius: 2rem; display: flex; justify-content: space-around; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 60; max-width: 500px; margin: 0 auto; }
-        .nav-item { border: none; background: none; color: #cbd5e1; padding: 0.5rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
-        .nav-item.active { color: #ea580c; transform: translateY(-5px); }
+        /* Floating Nav Style */
+        .bottom-nav { 
+          position: fixed; 
+          bottom: 1.5rem; 
+          left: 50%; 
+          transform: translateX(-50%); 
+          width: calc(100% - 2.5rem);
+          max-width: 450px; 
+          background: rgba(255,255,255,0.9); 
+          backdrop-filter: blur(24px); 
+          border: 1px solid rgba(255,255,255,0.2); 
+          padding: 0.75rem; 
+          border-radius: 2.5rem; 
+          display: flex; 
+          justify-content: space-around; 
+          box-shadow: 0 15px 35px rgba(0,0,0,0.1), inset 0 1px 1px rgba(255,255,255,0.5); 
+          z-index: 60; 
+        }
+        .nav-item { border: none; background: none; color: #94a3b8; padding: 0.75rem; border-radius: 1.5rem; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; display: flex; align-items: center; justify-content: center; }
+        .nav-item.active { color: #ea580c; background: #fff7ed; transform: translateY(-8px); shadow: 0 10px 15px -3px rgba(234, 88, 12, 0.1); }
 
-        .form-card { background: white; padding: 1.5rem; border-radius: 2rem; border: 1px solid #f0f0f0; }
-        .submit-btn { width: 100%; padding: 1.25rem; border-radius: 1.25rem; font-weight: 900; color: white; border: none; cursor: pointer; margin-top: 1.5rem; transition: transform 0.1s; }
-        .submit-btn:active { transform: scale(0.98); }
-        .submit-btn.sell { background: #16a34a; }
-        .submit-btn.buy { background: #2563eb; }
-        .submit-btn.expense { background: #dc2626; }
+        /* Form Card */
+        .form-card { background: white; padding: 2rem; border-radius: 2.5rem; border: 1px solid #f0f0f0; shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .submit-btn { width: 100%; font-weight: 900; color: white; border: none; cursor: pointer; margin-top: 2rem; }
+        .submit-btn.sell { background: #16a34a; shadow: 0 10px 15px -3px rgba(22, 163, 74, 0.3); }
+        .submit-btn.buy { background: #2563eb; shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3); }
+        .submit-btn.expense { background: #dc2626; shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.3); }
       `}</style>
-      
-      {/* Import Font with fallback */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;700&display=swap" />
     </div>
   );
 }

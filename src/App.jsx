@@ -37,7 +37,15 @@ import {
   Calendar,
   AlertCircle,
   ShieldCheck,
-  Fingerprint
+  Fingerprint,
+  ChevronRight,
+  Package,
+  Activity,
+  ArrowRightLeft,
+  Menu,
+  X,
+  LogOut,
+  ChevronDown
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
@@ -54,7 +62,7 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
-const appId = 'nishad_agro_v6_final';
+const appId = 'nishad_agro_doro_v8';
 
 // --- Constants ---
 const EGG_TYPES = ['লাল ডিম', 'সাদা ডিম', 'হাঁসের ডিম'];
@@ -67,28 +75,54 @@ const SELL_UNITS = {
   'soto': { label: 'শত (১০০)', value: 100 }
 };
 
-// --- Reusable Components ---
+// --- Helper UI Components ---
 
-const StatCard = ({ title, value, subValue, icon: Icon, color, blurred = false }) => (
-  <div className="stat-card">
-    <div className={`icon-circle ${color}`}>
-      <Icon size={20} />
+const NavItem = ({ id, icon: Icon, label, activeTab, setActiveTab }) => (
+  <button
+    onClick={() => setActiveTab(id)}
+    className={`nav-btn ${activeTab === id ? 'active' : ''}`}
+  >
+    <Icon size={24} />
+    <span className="nav-label">{label}</span>
+  </button>
+);
+
+const MetricCard = ({ title, value, subValue, icon: Icon, type, blurred = false }) => (
+  <div className={`metric-card-pro ${type}`}>
+    <div className="card-top">
+      <div className="m-icon-box"><Icon size={20} /></div>
+      <p className="m-label">{title}</p>
     </div>
-    <div className="card-info">
-      <p className="card-title">{title}</p>
+    <div className="card-bottom">
       {blurred ? (
-        <div className="blur-text">৳৳৳৳৳ <Lock size={12} /></div>
+        <div className="m-blur">XXXXX <Lock size={14} /></div>
       ) : (
-        <div className="value-group">
-          <h2 className="card-value">{value}</h2>
-          {subValue && <span className="card-sub">{subValue}</span>}
-        </div>
+        <h2 className="m-value">{value}</h2>
       )}
+      {subValue && !blurred && <p className="sub-label-text">{subValue}</p>}
     </div>
   </div>
 );
 
-// --- Main App ---
+const ModernInput = ({ label, type = "text", value, onChange, placeholder, required = false, readOnly = false, icon: Icon, className = "" }) => (
+  <div className={`doro-input-field ${className}`}>
+    {label && <label>{label} {required && <span style={{ color: '#F43F5E' }}>*</span>}</label>}
+    <div style={{ position: 'relative' }}>
+      {Icon && <Icon style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} size={18} />}
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        required={required}
+        style={{ paddingLeft: Icon ? '44px' : '20px' }}
+      />
+    </div>
+  </div>
+);
+
+// --- Main Application ---
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -99,11 +133,10 @@ export default function App() {
   const [userRole, setUserRole] = useState('guest'); 
   const [passwordInput, setPasswordInput] = useState('');
 
-  // Settings
   const [adminPassword, setAdminPassword] = useState('665911');
   const [subAdminPassword, setSubAdminPassword] = useState('1234');
   const [rates, setRates] = useState({
-    retail: { 'লাল ডিম': { pis: '', hali: '', case: '' }, 'সাদা ডিম': { pis: '', hali: '', case: '' }, 'হাঁসের ডিম': { pis: '', hali: '', case: '' } },
+    retail: { 'লাল ডিম': { pis: '', hali: '', case: '', dojon: '', soto: '' }, 'সাদা ডিম': { pis: '', hali: '', case: '', dojon: '', soto: '' }, 'হাঁসের ডিম': { pis: '', hali: '', case: '', dojon: '', soto: '' } },
     wholesale: { 'লাল ডিম': '', 'সাদা ডিম': '', 'হাঁসের ডিম': '' }
   });
 
@@ -112,23 +145,72 @@ export default function App() {
 
   const [formData, setFormData] = useState({
     eggType: 'লাল ডিম', unit: 'pis', quantity: '', rate: '', saleCategory: 'retail', 
-    customerName: '', discount: '', paidAmount: '', description: '', 
+    customerName: '', discount: '', paidAmount: '', amount: '', description: '', 
     date: new Date().toISOString().split('T')[0]
   });
 
-  // Derived state
   const isExpense = activeTab === 'expense';
   const isSell = activeTab === 'sell';
   const isBuy = activeTab === 'buy';
 
-  // --- Firebase Listeners ---
+  // --- Handlers ---
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (passwordInput === adminPassword) setUserRole('admin');
+    else if (passwordInput === subAdminPassword) setUserRole('subadmin');
+    else alert('Invalid PIN!');
+    setPasswordInput('');
+  };
+
+  const handleLogout = () => {
+    setUserRole('guest');
+    setActiveTab('dashboard');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting || !user) return;
+    setSubmitting(true);
+    try {
+      let qtyP = 0, total = 0, paid = 0, due = 0;
+      const type = activeTab;
+      if (type === 'expense') {
+        total = parseFloat(formData.amount || 0);
+        paid = total;
+      } else {
+        qtyP = parseInt(formData.quantity) * (type === 'sell' ? (SELL_UNITS[formData.unit]?.value || 1) : 1);
+        const sub = parseFloat(formData.quantity) * parseFloat(formData.rate);
+        total = sub - parseFloat(formData.discount || 0);
+        paid = formData.paidAmount === '' ? total : parseFloat(formData.paidAmount);
+        due = total - paid;
+      }
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'egg_transactions_v2'), {
+        ...formData, type, amount: total, paidAmount: paid, dueAmount: due, quantityInPieces: qtyP, createdAt: new Date().toISOString()
+      });
+      alert('Voucher Saved!');
+      setActiveTab('dashboard');
+      setFormData(prev => ({ ...prev, quantity: '', paidAmount: '', customerName: '', description: '', discount: '' }));
+    } catch (err) { alert('Error!'); }
+    finally { setSubmitting(false); }
+  };
+
+  const handleDelete = async (id) => {
+    if (userRole !== 'admin') return;
+    if (!window.confirm("Delete record?")) return;
+    try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'egg_transactions_v2', id)); } catch (err) { }
+  };
+
+  const saveRates = async () => {
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'rates'), rates);
+      alert('Rates updated!');
+    } catch (err) { alert("Error saving."); }
+  };
+
+  // --- Sync logic ---
   useEffect(() => {
     const initAuth = async () => {
-      try {
-        await signInAnonymously(auth);
-      } catch (e) {
-        console.error("Auth initialization failed", e);
-      }
+      try { await signInAnonymously(auth); } catch (e) { console.error(e); }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, setUser);
@@ -144,29 +226,22 @@ export default function App() {
       setTransactions(docs);
       setLoading(false);
     }, (err) => {
-      console.error("Firestore access error", err);
+      console.error(err);
       setLoading(false);
     });
 
     const docRates = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'rates');
-    const unsubRates = onSnapshot(docRates, (d) => {
-      if (d.exists()) setRates(d.data());
-    }, (err) => console.error("Rates access error", err));
+    onSnapshot(docRates, (d) => { if (d.exists()) setRates(d.data()); });
 
     const docAuth = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'auth');
-    const unsubAuth = onSnapshot(docAuth, (d) => {
+    onSnapshot(docAuth, (d) => {
       if (d.exists()) {
         const data = d.data();
         if (data.adminPassword) setAdminPassword(data.adminPassword);
         if (data.subAdminPassword) setSubAdminPassword(data.subAdminPassword);
       }
-    }, (err) => console.error("Auth settings access error", err));
-
-    return () => {
-      unsubTr();
-      unsubRates();
-      unsubAuth();
-    };
+    });
+    return () => { unsubTr(); };
   }, [user]);
 
   // Rate logic
@@ -180,7 +255,7 @@ export default function App() {
     }
   }, [formData.saleCategory, formData.eggType, formData.unit, isSell, rates]);
 
-  // Stats logic
+  // Calculations
   const stats = useMemo(() => {
     let stock = { 'লাল ডিম': 0, 'সাদা ডিম': 0, 'হাঁসের ডিম': 0 };
     let cash = 0, custDue = 0, suppDue = 0, todaySales = 0, todayProfit = 0, todayExp = 0;
@@ -226,311 +301,310 @@ export default function App() {
     });
   }, [transactions, dateFilter, typeFilter]);
 
-  // --- Handlers ---
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (passwordInput === adminPassword) setUserRole('admin');
-    else if (passwordInput === subAdminPassword) setUserRole('subadmin');
-    else alert('Invalid PIN!');
-    setPasswordInput('');
-  };
-
-  const handleLogout = () => {
-    setUserRole('guest');
-    setActiveTab('dashboard');
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (submitting || !user) return;
-    setSubmitting(true);
-    try {
-      let qtyP = 0, total = 0, paid = 0, due = 0;
-      const type = activeTab;
-      if (type === 'expense') {
-        total = parseFloat(formData.amount || 0);
-        paid = total;
-      } else {
-        qtyP = parseInt(formData.quantity) * (type === 'sell' ? (SELL_UNITS[formData.unit]?.value || 1) : 1);
-        const sub = parseFloat(formData.quantity) * parseFloat(formData.rate);
-        total = sub - parseFloat(formData.discount || 0);
-        paid = formData.paidAmount === '' ? total : parseFloat(formData.paidAmount);
-        due = total - paid;
-      }
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'egg_transactions_v2'), {
-        ...formData, type, amount: total, paidAmount: paid, dueAmount: due, quantityInPieces: qtyP, createdAt: new Date().toISOString()
-      });
-      alert('Sadhin bhabe save hoyeche!');
-      setActiveTab('dashboard');
-      setFormData(prev => ({ ...prev, quantity: '', paidAmount: '', customerName: '', description: '', discount: '' }));
-    } catch (err) { alert('Error occurred!'); }
-    finally { setSubmitting(false); }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete?")) return;
-    try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'egg_transactions_v2', id)); } catch (err) { alert("Error!"); }
-  };
-
-  if (loading) return <div className="app-loader">Loading Nishad Agro...</div>;
+  if (loading) return (
+    <div className="doro-loader">
+       <div className="spinner"></div>
+       <p>NISHAD AGRO</p>
+    </div>
+  );
 
   return (
-    <div className="app-main">
+    <div className="app-container">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
         
         * { margin: 0 !important; padding: 0 !important; box-sizing: border-box !important; font-family: 'Hind Siliguri', sans-serif !important; }
+        
         html, body, #root { 
           width: 100% !important; min-height: 100vh !important; display: block !important; 
-          background: #FDFCFB !important; text-align: left !important; place-items: unset !important;
+          background: #0F172A !important; color: #E2E8F0 !important; text-align: left !important; place-items: initial !important;
+          overflow-x: hidden !important;
         }
 
-        .app-main { display: flex; flex-direction: column; min-height: 100vh; width: 100%; max-width: 600px; margin: 0 auto !important; position: relative; padding-bottom: 100px !important; }
+        .app-container { width: 100%; min-height: 100vh; background: #0F172A; display: flex; flex-direction: column; align-items: center; position: relative; }
+        
+        /* Main View Wrapper (Phone Style) */
+        .main-view-wrapper { 
+          width: 100%; max-width: 600px; min-height: 100vh; background: #0F172A;
+          display: flex; flex-direction: column; padding-bottom: 100px !important; position: relative;
+        }
 
-        /* Header */
-        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 20px !important; background: #fff; border-bottom: 1px solid #F0F0F0; position: sticky; top: 0; z-index: 100; }
-        .logo-group { display: flex; align-items: center; gap: 10px !important; }
-        .cash-group { text-align: right; }
-        .cash-val { color: #EA580C; font-weight: 900; font-size: 20px; }
+        /* Bottom Nav */
+        .bottom-nav-bar {
+          position: fixed; bottom: 0; left: 0; width: 100%; display: flex; justify-content: center; z-index: 1000;
+          padding: 10px 20px 20px !important; pointer-events: none;
+        }
+        .nav-inner {
+          width: 100%; max-width: 500px; background: #1E293B; border-radius: 24px !important;
+          display: flex; justify-content: space-around; padding: 10px !important;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.5); pointer-events: auto; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px !important; border: none; background: none; color: #64748B; cursor: pointer; transition: 0.3s; padding: 8px !important; border-radius: 16px !important; }
+        .nav-btn.active { color: #fff; background: #F59E0B; }
+        .nav-label { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        /* Stat Cards */
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px !important; padding: 15px !important; }
-        .stat-card { background: #fff; padding: 16px !important; border-radius: 20px !important; border: 1px solid #F3F4F6; display: flex; align-items: center; gap: 12px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; }
-        .icon-circle { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-        .icon-circle.orange { background: #FFF7ED; color: #EA580C; }
-        .icon-circle.blue { background: #EFF6FF; color: #3B82F6; }
-        .icon-circle.green { background: #F0FDF4; color: #10B981; }
-        .icon-circle.rose { background: #FFF1F2; color: #F43F5E; }
-        .card-title { font-size: 10px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; }
-        .card-value { font-size: 18px; font-weight: 900; color: #111827; }
-        .blur-text { font-size: 16px; filter: blur(4px); color: #D1D5DB; display: flex; align-items: center; gap: 4px !important; }
+        /* Top Header */
+        .app-header {
+          height: 80px; width: 100%; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px);
+          display: flex; align-items: center; justify-content: space-between; padding: 0 24px !important;
+          border-bottom: 1px solid rgba(255,255,255,0.05); position: sticky; top: 0; z-index: 100;
+        }
+        .app-logo { display: flex; align-items: center; gap: 10px !important; }
+        .logo-symbol { width: 36px; height: 36px; background: #F59E0B; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #000; font-weight: 900; }
+        .app-title { font-size: 18px; font-weight: 900; color: #fff; }
 
-        /* Navigation */
-        .bottom-nav { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 24px !important; display: flex; justify-content: space-around; padding: 10px !important; box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important; z-index: 1000; border: 1px solid #F0F0F0; }
-        .nav-item { border: none; background: none; color: #9CA3AF; padding: 12px !important; border-radius: 18px !important; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; }
-        .nav-item.active { color: #EA580C; background: #FFF7ED; }
+        /* Metric Cards */
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px !important; padding: 20px !important; }
+        .metric-card-pro {
+          background: #1E293B; border-radius: 20px !important; padding: 20px !important; border: 1px solid rgba(255,255,255,0.03);
+          display: flex; flex-direction: column; justify-content: space-between; min-height: 120px; position: relative; overflow: hidden;
+        }
+        .m-icon-box { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px !important; }
+        .metric-card-pro.blue .m-icon-box { background: rgba(59, 130, 246, 0.1); color: #3B82F6; }
+        .metric-card-pro.orange .m-icon-box { background: rgba(245, 158, 11, 0.1); color: #F59E0B; }
+        .metric-card-pro.green .m-icon-box { background: rgba(16, 185, 129, 0.1); color: #10B981; }
+        .metric-card-pro.rose .m-icon-box { background: rgba(244, 63, 94, 0.1); color: #F43F5E; }
+        .m-label { font-size: 9px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 1px; }
+        .m-value { font-size: 18px; font-weight: 900; color: #fff; }
+        .sub-label-text { font-size: 8px; color: #475569; font-weight: 700; text-transform: uppercase; }
 
-        /* Forms */
-        .voucher-box { background: #fff; margin: 15px !important; border-radius: 24px !important; border: 1px solid #F3F4F6; overflow: hidden; padding: 20px !important; }
-        .form-label { font-size: 11px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; margin-bottom: 5px !important; display: block; margin-left: 5px !important; }
-        input, select { width: 100%; padding: 12px 16px !important; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 14px !important; font-weight: 700; font-size: 14px !important; outline: none !important; margin-bottom: 15px !important; }
-        input:focus { border-color: #EA580C; background: #fff; }
-        .bill-highlight { background: #111827; padding: 20px !important; border-radius: 18px !important; text-align: center; color: #fff; margin-bottom: 20px !important; }
-        .bill-highlight h3 { font-size: 28px; font-weight: 900; margin-top: 5px !important; }
-        .submit-btn { width: 100%; padding: 16px !important; border-radius: 16px !important; border: none; color: #fff; font-weight: 900; text-transform: uppercase; cursor: pointer; }
+        /* Digital Voucher Box */
+        .voucher-box { background: #1E293B; margin: 20px !important; border-radius: 24px !important; padding: 24px !important; border: 1px solid rgba(255,255,255,0.03); }
+        .voucher-summary { background: #0F172A; border-radius: 20px !important; padding: 24px !important; text-align: center; margin-bottom: 24px !important; border: 1px solid rgba(255,255,255,0.05); }
+        .voucher-summary h3 { font-size: 32px; font-weight: 900; color: #F59E0B; margin-top: 5px !important; }
+        
+        .doro-input-field { display: flex; flex-direction: column; gap: 6px !important; margin-bottom: 16px !important; }
+        .doro-input-field label { font-size: 10px; font-weight: 900; color: #64748B; text-transform: uppercase; margin-left: 4px !important; }
+        input, select { 
+          width: 100%; padding: 12px 16px !important; background: #0F172A !important; border: 1px solid #334155 !important;
+          border-radius: 12px !important; font-weight: 700 !important; font-size: 14px !important; outline: none !important; transition: 0.2s; color: #fff !important;
+        }
+        input:focus { border-color: #F59E0B; }
 
-        /* History */
-        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 15px !important; border-bottom: 1px solid #F9FAFB; }
-        .history-left { display: flex; align-items: center; gap: 12px !important; }
-        .type-indicator { width: 4px; height: 30px; border-radius: 2px; }
-        .type-indicator.sell { background: #10B981; }
-        .type-indicator.buy { background: #3B82F6; }
-        .type-indicator.expense { background: #F43F5E; }
-        .history-main-text { font-size: 14px; font-weight: 700; color: #111827; }
-        .history-sub-text { font-size: 11px; color: #9CA3AF; }
+        .confirm-btn { width: 100%; padding: 16px !important; border-radius: 14px !important; border: none; color: #000; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; cursor: pointer; margin-top: 10px !important; }
 
-        .app-loader { height: 100vh; display: flex; align-items: center; justify-content: center; color: #EA580C; font-weight: 900; }
-        .animate-up { animation: slideUp 0.4s ease-out; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* History Items */
+        .history-card { background: #1E293B; margin: 0 20px 10px !important; padding: 16px !important; border-radius: 16px !important; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.02); }
+        .hist-type { font-size: 9px; font-weight: 900; text-transform: uppercase; padding: 2px 8px !important; border-radius: 6px !important; margin-bottom: 4px !important; display: inline-block; }
+        .hist-title { font-size: 14px; font-weight: 800; color: #F1F5F9; }
+        .hist-date { font-size: 10px; color: #64748B; font-weight: 600; }
+        .hist-amt { font-size: 15px; font-weight: 900; color: #F59E0B; }
 
         /* Lock Screen */
-        .login-screen { position: fixed; inset: 0; z-index: 2000; background: linear-gradient(135deg, #FDFCFB 0%, #F3F4F6 100%); display: flex; align-items: center; justify-content: center; padding: 30px !important; }
-        .login-card { width: 100%; max-width: 380px; text-align: center; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); padding: 40px !important; border-radius: 32px !important; box-shadow: 0 20px 40px rgba(0,0,0,0.05); border: 1px solid #E5E7EB; }
-        .login-icon-wrapper { width: 80px; height: 80px; background: #EA580C; color: #fff; border-radius: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 30px !important; box-shadow: 0 10px 20px rgba(234, 88, 12, 0.3); }
-        .login-title { font-size: 26px; font-weight: 900; color: #111827; }
-        .login-field { width: 100%; padding: 18px !important; background: #fff; border: 2px solid #F3F4F6; border-radius: 20px !important; text-align: center; font-size: 24px !important; font-weight: 900 !important; letter-spacing: 12px; outline: none !important; }
-        .login-btn { width: 100%; padding: 18px !important; background: #111827; color: #fff; border: none; border-radius: 20px !important; font-weight: 900; font-size: 16px; cursor: pointer; }
+        .lock-screen { position: fixed; inset: 0; z-index: 2000; background: #0F172A; display: flex; align-items: center; justify-content: center; padding: 24px !important; }
+        .lock-card { width: 100%; max-width: 360px; text-align: center; }
+        .lock-icon { width: 80px; height: 80px; background: #F59E0B; color: #000; border-radius: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px !important; }
+        .lock-input { width: 100%; padding: 16px !important; background: #1E293B !important; border: 2px solid #334155 !important; border-radius: 16px !important; text-align: center; font-size: 24px !important; font-weight: 900 !important; letter-spacing: 8px; color: #fff !important; outline: none !important; }
+
+        .doro-loader { height: 100vh; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0F172A; color: #F59E0B; font-weight: 900; letter-spacing: 5px; }
+        .spinner { width: 40px; height: 40px; border: 4px solid rgba(245, 158, 11, 0.1); border-top-color: #F59E0B; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px !important; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      {/* Modern Professional Lock Screen */}
+      {/* --- LOCK SCREEN --- */}
       {userRole === 'guest' && (
-        <div className="login-screen">
-          <div className="login-card animate-up">
-            <div className="login-icon-wrapper"><ShieldCheck size={38} /></div>
-            <h1 className="login-title">নিশাদ এগ্রো</h1>
-            <p style={{ color: '#6B7280', fontSize: '13px', marginBottom: '40px' }}>সিস্টেম অ্যাক্সেস করতে পিন দিন</p>
+        <div className="lock-screen">
+          <div className="lock-card animate-in">
+            <div className="lock-icon"><Fingerprint size={40} /></div>
+            <h1 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '8px', color: '#fff' }}>নিশাদ এগ্রো</h1>
+            <p style={{ color: '#64748B', fontSize: '13px', marginBottom: '32px' }}>পিন দিয়ে আনলক করুন</p>
             <form onSubmit={handleLogin}>
-              <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="login-field" placeholder="••••" maxLength={6} autoFocus />
-              <button type="submit" className="login-btn flex items-center justify-center gap-2" style={{ marginTop: '20px' }}><Fingerprint size={20} /> আনলক করুন</button>
+              <input 
+                type="password" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} 
+                className="lock-input" placeholder="••••" maxLength={6} autoFocus 
+              />
+              <button className="confirm-btn" style={{ background: '#F59E0B', marginTop: '24px' }}>আনলক করুন</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Top Header */}
-      <header className="top-bar">
-        <div className="logo-group">
-          <div style={{ padding: '8px', background: '#EA580C', color: '#fff', borderRadius: '10px' }}><Egg size={20} /></div>
-          <span style={{ fontWeight: 900, fontSize: '18px' }}>নিশাদ এগ্রো</span>
-        </div>
-        <div className="cash-group">
-          <p style={{ fontSize: '9px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>ক্যাশ বক্স</p>
-          <p className="cash-val">৳ {(stats.cash || 0).toLocaleString()}</p>
-        </div>
-      </header>
+      {/* --- MAIN VIEW --- */}
+      <div className="main-view-wrapper">
+        
+        {/* Header */}
+        <header className="app-header">
+           <div className="app-logo">
+              <div className="logo-symbol"><Egg size={20} /></div>
+              <h1 className="app-title">নিশাদ এগ্রো</h1>
+           </div>
+           <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '8px', fontWeight: 900, color: '#64748B', textTransform: 'uppercase' }}>Cash Balance</p>
+              <p style={{ fontSize: '16px', fontWeight: 900, color: '#F59E0B' }}>৳ {(stats.cash || 0).toLocaleString()}</p>
+           </div>
+        </header>
 
-      {/* Main Content */}
-      <main className="animate-up">
-        {activeTab === 'dashboard' && (
-          <div className="tab-dashboard">
-            <div className="stat-grid">
-               <StatCard title="লাল ডিম" value={stats.stock['লাল ডিম'] || 0} subValue="পিস" icon={Egg} color="orange" />
-               <StatCard title="সাদা ডিম" value={stats.stock['সাদা ডিম'] || 0} subValue="পিস" icon={Egg} color="blue" />
-               <StatCard title="হাঁসের ডিম" value={stats.stock['হাঁসের ডিম'] || 0} subValue="পিস" icon={Egg} color="rose" />
-               <StatCard title="মার্কেট বাকি" value={`৳${(stats.custDue || 0).toLocaleString()}`} icon={Users} color="green" />
-               <StatCard title="মহাজন বাকি" value={`৳${(stats.suppDue || 0).toLocaleString()}`} icon={AlertCircle} color="rose" />
-               <StatCard title="আজকের লাভ" value={`৳${(stats.todayProfit || 0).toLocaleString()}`} icon={TrendingUp} color="green" blurred={userRole !== 'admin'} />
+        <main className="animate-in">
+          
+          {/* DASHBOARD */}
+          {activeTab === 'dashboard' && (
+            <div className="tab-content">
+               <div className="metrics-grid">
+                  <MetricCard title="লাল ডিম স্টক" value={`${stats.stock['লাল ডিম'] || 0}`} subValue="PIS" icon={Egg} type="orange" />
+                  <MetricCard title="সাদা ডিম স্টক" value={`${stats.stock['সাদা ডিম'] || 0}`} subValue="PIS" icon={Egg} type="blue" />
+                  <MetricCard title="মার্কেট বাকি" value={`৳${(stats.custDue || 0).toLocaleString()}`} icon={Users} type="green" />
+                  <MetricCard title="মহাজন বাকি" value={`৳${(stats.suppDue || 0).toLocaleString()}`} icon={AlertCircle} type="rose" />
+                  <MetricCard title="আজকের বিক্রি" value={`৳${(stats.todaySales || 0).toLocaleString()}`} icon={TrendingUp} type="orange" />
+                  <MetricCard title="আজকের লাভ" value={`৳${(stats.todayProfit || 0).toLocaleString()}`} icon={ShieldCheck} type="green" blurred={userRole !== 'admin'} />
+               </div>
+
+               <div style={{ padding: '0 20px 20px !important' }}>
+                  <div style={{ background: '#111827', padding: '24px', borderRadius: '24px', color: '#fff', border: '1px solid rgba(255,255,255,0.05)' }}>
+                     <p style={{ fontSize: '9px', fontWeight: 900, opacity: 0.5, textTransform: 'uppercase' }}>Total Cash Flow Today</p>
+                     <h2 style={{ fontSize: '28px', fontWeight: 900, marginTop: '8px' }}>৳ {(stats.todaySales - stats.todayExp).toLocaleString()}</h2>
+                  </div>
+               </div>
+
+               <h3 style={{ fontSize: '12px', fontWeight: 900, color: '#475569', margin: '10px 24px !important', textTransform: 'uppercase' }}>সাম্প্রতিক লেনদেন</h3>
+               {transactions.slice(0, 5).map(t => (
+                 <div key={t.id} className="history-card">
+                    <div>
+                       <span className="hist-type" style={{ background: t.type === 'sell' ? 'rgba(16,185,129,0.1)' : t.type === 'buy' ? 'rgba(59,130,246,0.1)' : 'rgba(244,63,94,0.1)', color: t.type === 'sell' ? '#10B981' : t.type === 'buy' ? '#3B82F6' : '#F43F5E' }}>{t.type}</span>
+                       <p className="hist-title">{t.customerName || t.eggType || t.description}</p>
+                       <p className="hist-date">{t.date}</p>
+                    </div>
+                    <p className="hist-amt">৳ {(t.amount || 0).toLocaleString()}</p>
+                 </div>
+               ))}
             </div>
+          )}
 
-            <div style={{ padding: '15px' }}>
-              <div style={{ background: '#111827', padding: '24px', borderRadius: '24px', color: '#fff', position: 'relative', overflow: 'hidden' }}>
-                <p style={{ fontSize: '10px', opacity: 0.5, fontWeight: 900, textTransform: 'uppercase' }}>আজকের মোট বিক্রি</p>
-                <h2 style={{ fontSize: '32px', fontWeight: 900 }}>৳ {(stats.todaySales || 0).toLocaleString()}</h2>
-                <div style={{ position: 'absolute', right: '-20px', bottom: '-20px', opacity: 0.1 }}><ShoppingCart size={100} /></div>
-              </div>
+          {/* VOUCHERS */}
+          {(isSell || isBuy || isExpense) && (
+            <div className="tab-content animate-in">
+               <div className="voucher-box">
+                  <div className="voucher-summary">
+                     <p style={{ fontSize: '10px', fontWeight: 900, color: '#64748B', textTransform: 'uppercase' }}>Net Payable Bill</p>
+                     <h3>৳ {(parseFloat(formData.quantity || 0) * parseFloat(formData.rate || 0) - parseFloat(formData.discount || 0) + (isExpense ? parseFloat(formData.amount || 0) : 0)).toLocaleString()}</h3>
+                  </div>
+
+                  <form onSubmit={handleSubmit}>
+                     <ModernInput label="Transaction Date" type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} required icon={Calendar} />
+                     
+                     {!isExpense && (
+                        <>
+                           <div className="doro-input-field">
+                              <label>Egg Category</label>
+                              <select value={formData.eggType} onChange={e => setFormData(p => ({ ...p, eggType: e.target.value }))}>
+                                {EGG_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
+                              </select>
+                           </div>
+                           
+                           {isSell && (
+                             <div style={{ display: 'flex', background: '#0F172A', padding: '5px', borderRadius: '14px', marginBottom: '20px' }}>
+                                <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'retail' }))} style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '10px', fontSize: '11px', fontWeight: 900, background: formData.saleCategory === 'retail' ? '#1E293B' : 'none', color: formData.saleCategory === 'retail' ? '#F59E0B' : '#64748B' }}>RETAIL</button>
+                                <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'wholesale' }))} style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '10px', fontSize: '11px', fontWeight: 900, background: formData.saleCategory === 'wholesale' ? '#1E293B' : 'none', color: formData.saleCategory === 'wholesale' ? '#F59E0B' : '#64748B' }}>WHOLESALE</button>
+                             </div>
+                           )}
+
+                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                              <ModernInput label="Quantity" type="number" value={formData.quantity} onChange={e => setFormData(p => ({ ...p, quantity: e.target.value }))} placeholder="0" required />
+                              <div className="doro-input-field">
+                                <label>Unit</label>
+                                <select value={formData.unit} onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} disabled={isBuy || (isSell && formData.saleCategory === 'wholesale')}>
+                                  {Object.entries(SELL_UNITS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                                </select>
+                              </div>
+                           </div>
+
+                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                              <ModernInput label="Price (Rate)" type="number" value={formData.rate} onChange={e => setFormData(p => ({ ...p, rate: e.target.value }))} required />
+                              <ModernInput label="Discount" type="number" value={formData.discount} onChange={e => setFormData(p => ({ ...p, discount: e.target.value }))} placeholder="0" />
+                           </div>
+
+                           <ModernInput label="Name" value={formData.customerName} onChange={e => setFormData(p => ({ ...p, customerName: e.target.value }))} placeholder="Full Name" icon={User} />
+                           <ModernInput label="Cash Received" type="number" value={formData.paidAmount} onChange={e => setFormData(p => ({ ...p, paidAmount: e.target.value }))} placeholder="Full Amount" icon={Wallet} />
+                        </>
+                     )}
+
+                     {isExpense && (
+                        <>
+                           <div className="doro-input-field">
+                              <label>Expense Category</label>
+                              <select value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}>
+                                {EXPENSE_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
+                                <option value="অন্যান্য">অন্যান্য</option>
+                              </select>
+                           </div>
+                           <ModernInput label="Amount" type="number" value={formData.amount} onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))} required icon={Wallet} />
+                        </>
+                     )}
+
+                     <button disabled={submitting} className="confirm-btn" style={{ background: isSell ? '#10B981' : isBuy ? '#3B82F6' : '#F43F5E', color: '#fff' }}>{submitting ? 'PROCESSING...' : 'Confirm Voucher'}</button>
+                  </form>
+               </div>
             </div>
+          )}
 
-            <div style={{ padding: '15px' }}>
-               <h3 style={{ fontSize: '14px', fontWeight: 900, color: '#4B5563', marginBottom: '15px' }}>সাম্প্রতিক লেনদেন</h3>
-               <div style={{ background: '#fff', borderRadius: '24px', border: '1px solid #F3F4F6', overflow: 'hidden' }}>
-                  {transactions.slice(0, 5).map(t => (
-                    <div key={t.id} className="history-item">
-                      <div className="history-left">
-                         <div className={`type-indicator ${t.type}`}></div>
-                         <div>
-                            <p className="history-main-text">{t.customerName || t.description || t.eggType}</p>
-                            <p className="history-sub-text">{t.type} • {t.date}</p>
-                         </div>
-                      </div>
-                      <p style={{ fontWeight: 900, fontSize: '14px' }}>৳{(t.amount || 0).toLocaleString()}</p>
+          {/* HISTORY */}
+          {activeTab === 'history' && (
+            <div className="tab-content animate-in">
+               <div style={{ display: 'flex', gap: '10px', padding: '20px !important', overflowX: 'auto' }} className="no-scrollbar">
+                  {['all', 'sell', 'buy', 'expense'].map(t => (
+                    <button key={t} onClick={() => setTypeFilter(t)} style={{ padding: '10px 20px', borderRadius: '12px', border: '1px solid #334155', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', cursor: 'pointer', background: typeFilter === t ? '#F59E0B' : '#1E293B', color: typeFilter === t ? '#000' : '#64748B' }}>{t}</button>
+                  ))}
+               </div>
+               <div style={{ padding: '0 4px' }}>
+                  {filteredHistory.map(t => (
+                    <div key={t.id} className="history-card">
+                       <div>
+                          <p className="hist-title">{t.customerName || t.eggType || t.description}</p>
+                          <p className="hist-date">{t.date} • {t.type.toUpperCase()}</p>
+                          {t.dueAmount > 0 ? <span style={{ color: '#F43F5E', fontWeight: 900, fontSize: '10px' }}>DUE: ৳{t.dueAmount}</span> : <span style={{ color: '#10B981', fontWeight: 900, fontSize: '10px' }}>PAID</span>}
+                       </div>
+                       <div style={{ textAlign: 'right' }}>
+                          <p className="hist-amt">৳ {(t.amount || 0).toLocaleString()}</p>
+                          {userRole === 'admin' && <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', color: '#475569', marginTop: '10px' }}><Trash2 size={16}/></button>}
+                       </div>
                     </div>
                   ))}
                </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {(isSell || isBuy || isExpense) && (
-          <div className="voucher-box">
-             <div className="bill-highlight" style={{ background: isSell ? '#10B981' : isBuy ? '#3B82F6' : '#EF4444' }}>
-                <p style={{ fontSize: '10px', opacity: 0.8, fontWeight: 900 }}>মোট ভাউচার বিল</p>
-                <h3>৳ {(parseFloat(formData.quantity || 0) * parseFloat(formData.rate || 0) - parseFloat(formData.discount || 0) + (isExpense ? parseFloat(formData.amount || 0) : 0)).toLocaleString()}</h3>
-             </div>
-             <form onSubmit={handleSubmit}>
-                <label className="form-label">তারিখ</label>
-                <input type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} required />
-                {!isExpense && (
-                  <>
-                    <label className="form-label">ডিমের ধরণ</label>
-                    <select value={formData.eggType} onChange={e => setFormData(p => ({ ...p, eggType: e.target.value }))}>
-                      {EGG_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
-                    {isSell && (
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
-                        <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'retail' }))} style={{ flex: 1, padding: '12px', borderRadius: '14px', border: 'none', fontSize: '12px', fontWeight: 900, background: formData.saleCategory === 'retail' ? '#EA580C' : '#F3F4F6', color: formData.saleCategory === 'retail' ? '#fff' : '#9CA3AF' }}>খুচরা</button>
-                        <button type="button" onClick={() => setFormData(p => ({ ...p, saleCategory: 'wholesale' }))} style={{ flex: 1, padding: '12px', borderRadius: '14px', border: 'none', fontSize: '12px', fontWeight: 900, background: formData.saleCategory === 'wholesale' ? '#EA580C' : '#F3F4F6', color: formData.saleCategory === 'wholesale' ? '#fff' : '#9CA3AF' }}>পাইকারি</button>
-                      </div>
-                    )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div><label className="form-label">পরিমাণ</label><input type="number" value={formData.quantity} onChange={e => setFormData(p => ({ ...p, quantity: e.target.value }))} required /></div>
-                      <div>
-                        <label className="form-label">একক</label>
-                        <select value={formData.unit} onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} disabled={isBuy || (isSell && formData.saleCategory === 'wholesale')}>
-                          {Object.entries(SELL_UNITS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                        </select>
-                      </div>
+          {/* SETTINGS */}
+          {activeTab === 'settings' && userRole === 'admin' && (
+            <div className="tab-content animate-in" style={{ padding: '20px' }}>
+               <div style={{ background: '#1E293B', borderRadius: '24px', padding: '24px !important', border: '1px solid rgba(255,255,255,0.03)' }}>
+                  <h2 style={{ fontSize: '18px', fontWeight: 900, marginBottom: '24px', color: '#fff' }}>Rate Configuration</h2>
+                  {EGG_TYPES.map(egg => (
+                    <div key={egg} style={{ padding: '20px', background: '#0F172A', borderRadius: '16px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                       <h4 style={{ fontWeight: 800, fontSize: '14px', marginBottom: '16px', color: '#F59E0B' }}>{egg}</h4>
+                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                          {['pis', 'hali', 'case'].map(u => (
+                            <div key={u}>
+                               <label className="field-label" style={{ textAlign: 'center', display: 'block', fontSize: '9px', fontWeight: 900, color: '#64748B', textTransform: 'uppercase' }}>{u}</label>
+                               <input type="number" value={rates.retail[egg]?.[u] || ''} onChange={e => {
+                                 const newRates = {...rates};
+                                 newRates.retail[egg][u] = e.target.value;
+                                 setRates(newRates);
+                               }} style={{ textAlign: 'center', fontWeight: 900, fontSize: '16px' }} />
+                            </div>
+                          ))}
+                       </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div><label className="form-label">দর</label><input type="number" value={formData.rate} onChange={e => setFormData(p => ({ ...p, rate: e.target.value }))} required /></div>
-                      <div><label className="form-label">ছাড়</label><input type="number" value={formData.discount} onChange={e => setFormData(p => ({ ...p, discount: e.target.value }))} /></div>
-                    </div>
-                    <label className="form-label">নাম</label>
-                    <input type="text" value={formData.customerName} onChange={e => setFormData(p => ({ ...p, customerName: e.target.value }))} />
-                    <label className="form-label">নগদ পরিশোধ</label>
-                    <input type="number" value={formData.paidAmount} onChange={e => setFormData(p => ({ ...p, paidAmount: e.target.value }))} />
-                  </>
-                )}
-                {isExpense && (
-                  <>
-                    <label className="form-label">খাত</label>
-                    <select value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}>
-                      {EXPENSE_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
-                      <option value="অন্যান্য">অন্যান্য</option>
-                    </select>
-                    <label className="form-label">টাকা</label>
-                    <input type="number" value={formData.amount} onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))} required />
-                  </>
-                )}
-                <button type="submit" disabled={submitting} className="submit-btn" style={{ background: isSell ? '#10B981' : isBuy ? '#3B82F6' : '#EF4444' }}>{submitting ? 'Saving...' : 'ভাউচার সেভ করুন'}</button>
-             </form>
-          </div>
-        )}
+                  ))}
+                  <button onClick={saveRates} className="confirm-btn" style={{ background: '#F59E0B' }}>Save Config</button>
+                  <button onClick={handleLogout} style={{ width: '100%', background: 'none', border: '1px solid #334155', color: '#F43F5E', padding: '16px !important', borderRadius: '14px', fontWeight: 900, marginTop: '16px' }}>LOGOUT</button>
+               </div>
+            </div>
+          )}
 
-        {activeTab === 'history' && (
-          <div style={{ padding: '15px' }}>
-             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '15px' }} className="no-scrollbar">
-                {['all', 'sell', 'buy', 'expense'].map(t => (
-                  <button key={t} onClick={() => setTypeFilter(t)} style={{ padding: '10px 20px', borderRadius: '14px', border: '1px solid #F0F0F0', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', background: typeFilter === t ? '#111827' : '#fff', color: typeFilter === t ? '#fff' : '#9CA3AF' }}>{t}</button>
-                ))}
-             </div>
-             <div style={{ background: '#fff', borderRadius: '24px', border: '1px solid #F3F4F6' }}>
-                {filteredHistory.map(t => (
-                  <div key={t.id} className="history-item">
-                     <div className="history-left">
-                        <div className={`type-indicator ${t.type}`}></div>
-                        <div>
-                           <p className="history-main-text">{t.customerName || t.eggType || t.description}</p>
-                           <p className="history-sub-text">{t.date} • ৳{(t.amount || 0).toLocaleString()}</p>
-                        </div>
-                     </div>
-                     <div style={{ textAlign: 'right' }}>
-                        {t.dueAmount > 0 ? <span style={{ color: '#F43F5E', fontSize: '10px', fontWeight: 900 }}>DUE ৳{t.dueAmount}</span> : <span style={{ color: '#10B981', fontSize: '10px', fontWeight: 900 }}>PAID</span>}
-                        {userRole === 'admin' && <button onClick={() => handleDelete(t.id)} style={{ display: 'block', border: 'none', background: 'none', color: '#D1D5DB', marginLeft: 'auto' }}><Trash2 size={16}/></button>}
-                     </div>
-                  </div>
-                ))}
-             </div>
-          </div>
-        )}
+        </main>
+      </div>
 
-        {activeTab === 'settings' && userRole === 'admin' && (
-          <div style={{ padding: '20px' }}>
-             <div style={{ background: '#fff', padding: '24px', borderRadius: '28px', border: '1px solid #F3F4F6' }}>
-                <h2 className="text-xl font-black mb-6 flex items-center gap-2"><Settings className="text-orange-600"/> রেট সেটিংস</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {EGG_TYPES.map(egg => (
-                      <div key={egg} style={{ padding: '20px', background: '#F9FAFB', borderRadius: '20px' }}>
-                        <h4 style={{ fontWeight: 900, marginBottom: '15px' }}>{egg}</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                            {['pis', 'hali', 'case'].map(u => (
-                              <div key={u}>
-                                <label className="form-label">{u}</label>
-                                <input type="number" value={rates.retail[egg]?.[u] || ''} onChange={e => {
-                                  const newRates = {...rates};
-                                  newRates.retail[egg][u] = e.target.value;
-                                  setRates(newRates);
-                                }} style={{ background: '#fff' }} />
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    ))}
-                    <button onClick={async () => { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'rates'), rates); alert('Update successful!'); }} className="submit-btn" style={{ background: '#111827' }}>Update</button>
-                    <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#F43F5E', fontWeight: 900, marginTop: '20px' }}>Logout</button>
-                </div>
-             </div>
-          </div>
-        )}
-      </main>
-
-      {/* Bottom Navigation */}
-      <nav className="bottom-nav">
-        <button onClick={() => setActiveTab('dashboard')} className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}><LayoutDashboard size={24}/></button>
-        <button onClick={() => setActiveTab('sell')} className={`nav-item ${activeTab === 'sell' ? 'active' : ''}`}><ShoppingCart size={24}/></button>
-        <button onClick={() => setActiveTab('buy')} className={`nav-item ${activeTab === 'buy' ? 'active' : ''}`}><PlusCircle size={24}/></button>
-        <button onClick={() => setActiveTab('expense')} className={`nav-item ${activeTab === 'expense' ? 'active' : ''}`}><Wallet size={24}/></button>
-        <button onClick={() => setActiveTab('history')} className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}><History size={24}/></button>
-        {userRole === 'admin' && <button onClick={() => setActiveTab('settings')} className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}><Settings size={24}/></button>}
+      {/* --- BOTTOM NAVIGATION BAR --- */}
+      <nav className="bottom-nav-bar">
+         <div className="nav-inner">
+            <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <NavItem id="sell" icon={ShoppingCart} label="Sell" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <NavItem id="buy" icon={ArrowDownCircle} label="Buy" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <NavItem id="expense" icon={Wallet} label="Expense" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <NavItem id="history" icon={History} label="History" activeTab={activeTab} setActiveTab={setActiveTab} />
+            {userRole === 'admin' && <NavItem id="settings" icon={Settings} label="Admin" activeTab={activeTab} setActiveTab={setActiveTab} />}
+         </div>
       </nav>
 
     </div>
